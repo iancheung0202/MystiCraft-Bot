@@ -741,7 +741,7 @@ class HTSkipView(discord.ui.View):
         if await _deny_if_restricted(interaction, interaction.user):
             return
         await interaction.response.send_message(
-            "To finalize the results, please use the `/ht3 results` command in this thread. Fill in the required fields such as the user, region, scores, role they attempted, and whether they passed or failed.",
+            "To finalize the results, please use the `/ht results` command in this thread. Fill in the required fields such as the user, region, scores, role they attempted, and whether they passed or failed.",
             ephemeral=True
         )
 
@@ -1015,7 +1015,7 @@ class ApproveDenyView(discord.ui.View):
 
         review_msg_id = interaction.message.id
         await interaction.response.defer(ephemeral=True)
-        cog = interaction.client.get_cog('ht3')
+        cog = interaction.client.get_cog('ht')
         if not cog:
             return await interaction.followup.send("Bot configuration error: Cog not found.", ephemeral=True)
         
@@ -1046,7 +1046,7 @@ class ApproveDenyView(discord.ui.View):
         await interaction.response.send_message("Result denied.", ephemeral=True)
 
 
-class HTWaitlistCmd(commands.GroupCog, name="ht3"):
+class HTWaitlistCmd(commands.GroupCog, name="ht"):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         super().__init__()
@@ -1060,7 +1060,7 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
         user="Specify the user",
         region="Specify the user's region",
         scores="Specify the score",
-        new_role="Specify the rank role they attempted (regardless of pass or fail)",
+        attempted_rank="Specify the rank role they attempted (regardless of pass or fail)",
         tester="The tester who performed the test (defaults to you)",
         remarks="Optional remarks",
     )
@@ -1085,7 +1085,7 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
         user: discord.Member,
         region: str,
         scores: str,
-        new_role: discord.Role,
+        attempted_rank: discord.Role,
         pass_or_fail: app_commands.Choice[str],
         tester: discord.Member = None,
         remarks: str = None,
@@ -1099,7 +1099,7 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
 
         # Allow eligible HT testers (from return_item) as well, but restrict them
         # to only grant HT3 and require approval from a manager.
-        gamemode_name = new_role.name.split(" ")[1] if len(new_role.name.split(" ")) > 1 else None
+        gamemode_name = attempted_rank.name.split(" ")[1] if len(attempted_rank.name.split(" ")) > 1 else None
         eligible_tester_role_ids = []
         if gamemode_name:
             try:
@@ -1136,9 +1136,9 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
                 ephemeral=True
             )
 
-        # If tester is an eligible tester (not a manager), restrict new_role to HT3 only
+        # If tester is an eligible tester (not a manager), restrict attempted_rank to HT3 only
         if has_eligible_tester_role and not has_manager_permission:
-            if "HT3" not in new_role.name:
+            if "HT3" not in attempted_rank.name:
                 return await interaction.followup.send(
                     "<:cross1:1339153202859474956> As an eligible tester, you may only grant HT3 roles. Please select an HT3 role **(the rank they ATTEMPTED**). If they failed their HT3 test, please still choose `@HT3 Gamemode` role but choose `Fail`.",
                     ephemeral=True,
@@ -1166,7 +1166,7 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
                         ephemeral=True
                     )
         
-        gamemode = new_role.name.split(" ")[1]
+        gamemode = attempted_rank.name.split(" ")[1]
         removeRole = None
         for role in user.roles:
             try:
@@ -1181,8 +1181,8 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
             previousRank = "N/A"
 
         if not (
-            ("LT" in new_role.name or "HT" in new_role.name)
-            and "tester" not in new_role.name.lower()
+            ("LT" in attempted_rank.name or "HT" in attempted_rank.name)
+            and "tester" not in attempted_rank.name.lower()
         ):
             return await interaction.followup.send(
                 "<:warn:1459986909911842846> Double check you selected the correct role!", ephemeral=True
@@ -1193,7 +1193,7 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
                 "<:cross1:1339153202859474956> You cannot test yourself!", ephemeral=True
             )
         
-        attempted_rank = new_role.name.split(" ")[0]
+        attempted_rank = attempted_rank.name.split(" ")[0]
         
         if not (
             attempted_rank == "HT3"
@@ -1247,7 +1247,7 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
                 
                 if fallback_role:
                     # Swap the role so DB and Role Grant use the lower rank
-                    new_role = fallback_role
+                    attempted_rank = fallback_role
                     # Update remarks to reflect failure in DB
                     fail_note = f"Failed {attempted_rank} Test"
                     remarks = f"{remarks} | {fail_note}" if remarks else fail_note
@@ -1259,13 +1259,13 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
             else:
                 # If they failed a rank with no mapping, we don't grant a new role, 
                 # but we still want to log the fail in DB and post the text.
-                new_role = None # No role to grant
+                attempted_rank = None # No role to grant
                 fail_note = f"Failed {attempted_rank} Test"
                 remarks = f"{remarks} | {fail_note}" if remarks else fail_note
 
         # Determine new rank string (for DB/Embed)
-        # If new_role is None (failed with no fallback), use "None"
-        new_rank = new_role.name.split(" ")[0] if new_role else "None"
+        # If attempted_rank is None (failed with no fallback), use "None"
+        new_rank = attempted_rank.name.split(" ")[0] if attempted_rank else "None"
 
         # Construct Embed (Used for Review Logs, and optionally if not overridden)
         embed = discord.Embed(title=f"{username}'s Results :trophy:")
@@ -1300,8 +1300,8 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
             'remarks': remarks,
             'tester_discord_username': tester_user.name,
             'tester_user_id': tester_user.id,
-            'new_role_id': new_role.id if new_role else None,
-            'new_role_name': new_role.name if new_role else None,
+            'attempted_rank_id': attempted_rank.id if attempted_rank else None,
+            'attempted_rank_name': attempted_rank.name if attempted_rank else None,
             'submitted_by': interaction.user.id,
             'override_msg': override_message # Pass the text message to the publisher
         }
@@ -1364,7 +1364,7 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
         guild = interaction.guild
         player_id = int(payload.get('player_user_id'))
         tester_id = int(payload.get('tester_user_id'))
-        new_role_id = int(payload.get('new_role_id')) if payload.get('new_role_id') else None
+        attempted_rank_id = int(payload.get('attempted_rank_id')) if payload.get('attempted_rank_id') else None
         override_msg = payload.get('override_msg')
 
         # Fetch member objects
@@ -1387,9 +1387,9 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
             return None
 
         # Try to add role to player (Even if they failed, they get the fallback role defined in payload)
-        if player_member and new_role_id:
+        if player_member and attempted_rank_id:
             try:
-                await player_member.add_roles(guild.get_role(new_role_id))
+                await player_member.add_roles(guild.get_role(attempted_rank_id))
             except Exception:
                 pass
 
@@ -1469,18 +1469,18 @@ class HTWaitlistCmd(commands.GroupCog, name="ht3"):
         new_tier = get_tier_index(new_rep)
         if new_tier > old_tier:
             old_role_id = TIER_ROLES.get(old_tier)
-            new_role_id = TIER_ROLES[new_tier]
+            attempted_rank_id = TIER_ROLES[new_tier]
             try:
                 if tester_member:
                     if old_role_id:
                         await tester_member.remove_roles(guild.get_role(old_role_id))
-                    await tester_member.add_roles(guild.get_role(new_role_id))
+                    await tester_member.add_roles(guild.get_role(attempted_rank_id))
             except Exception:
                 pass
             channel = guild.get_channel(1467403596780929055)
             embed_desc = f"<@{tester_id}> has reached **{TIER_THRESHOLDS[new_tier]}** reps and ranked up to `{TIER_NAMES[new_tier]}`!"
             if TIER_TO_MAIN[new_tier] > TIER_TO_MAIN.get(old_tier, -1):
-                embed_desc += f"\nThey also earned the <@&{new_role_id}> role!"
+                embed_desc += f"\nThey also earned the <@&{attempted_rank_id}> role!"
             rank_embed = discord.Embed(description=embed_desc, color=discord.Color.from_rgb(*tier_colors[new_tier]))
             await channel.send(content=f"<@{tester_id}>", embed=rank_embed)
 
