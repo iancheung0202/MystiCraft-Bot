@@ -12,8 +12,8 @@ from discord.ext import commands
 from firebase_admin import credentials
 
 from commands.Tickets.tickets import CloseTicketButton, TicketAdminButtons, ConfirmCloseTicketButtons, CreateTicketButtonView, StaffAppDelete, AcceptRejectButton, ApplyForStaff, MediaAcceptRejectButton, ResolveFlagView, AppealCloseTicketButton, SelectView
-from commands.Tickets.waitlist import WaitlistSelectionView, JoinQueueButtonView
-from commands.Tickets.ht_waitlist import HTWaitlistSelectionView, ApproveDenyView, HTSkipView, FindTicketView
+from commands.Tierlist.waitlist import WaitlistSelectionView, JoinQueueButtonView
+from commands.Tierlist.ht_waitlist import HTWaitlistSelectionView, ApproveDenyView, HTSkipView, FindTicketView
 from commands.Help.help import HelpPanel
 from commands.onMessage import RefreshStaffView, SelfRoles, RefreshStaffV2View
 from commands.Tickets.summary import Stats

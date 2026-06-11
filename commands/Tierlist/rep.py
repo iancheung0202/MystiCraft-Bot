@@ -1,4 +1,4 @@
-from commands.Tickets.tier import COLORS, load_font, fetch_image, draw_rounded_rect, DISCORD_ICON_URL
+from commands.Tierlist.tier import COLORS, load_font, fetch_image, draw_rounded_rect, DISCORD_ICON_URL
 import discord
 import io
 import aiohttp
