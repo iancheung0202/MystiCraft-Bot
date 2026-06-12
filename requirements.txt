@@ -18,3 +18,4 @@ google-genai
 beautifulsoup4
 aiomysql
 groq
+python-dotenv

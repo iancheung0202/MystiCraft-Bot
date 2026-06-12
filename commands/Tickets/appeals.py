@@ -1,3 +1,4 @@
+import re
 import discord
 import datetime
 import time
@@ -175,13 +176,23 @@ class AppealCloseTicketButton(discord.ui.View):
             return await interaction.edit_original_response(content=None, embed=discord.Embed(
                 description=f"No punishments found for `{ign}`.", color=0xFF0000))
 
-        punishment_embed = discord.Embed(
-            title=f"Punishment History for {ign}",
-            description=f"We found `{len(user_data)}` past punishment{'s' if len(user_data) > 1 else ''}.",
-            color=0xFFFF00
-        )
+        punishment_embeds = []
+        sorted_entries = sorted(user_data.values(), key=lambda x: x["timestamp"], reverse=True)
 
-        for entry in sorted(user_data.values(), key=lambda x: x["timestamp"], reverse=True):
+        for index, entry in enumerate(sorted_entries):
+            if index % 25 == 0:
+                chunk_num = (index // 25) + 1
+                title_suffix = f" (Part {chunk_num})" if len(user_data) > 25 else ""
+                
+                p_embed = discord.Embed(
+                    title=f"Punishment History for {ign}{title_suffix}",
+                    color=0xFFFF00
+                )
+                if index == 0:
+                    p_embed.description = f"We found `{len(user_data)}` past punishment{'s' if len(user_data) > 1 else ''}."
+                
+                punishment_embeds.append(p_embed)
+
             timestamp = entry["timestamp"]
             evidence_links = []
 
@@ -209,9 +220,32 @@ class AppealCloseTicketButton(discord.ui.View):
             description = f"<t:{timestamp}:R>\n" + "\n".join(lines)
             description += f"\n-# [Log]({entry['log_url']}) | {evidence_text}"
 
-            punishment_embed.add_field(name=f"{entry['action']} - <t:{timestamp}:d>", value=description, inline=True)
+            punishment_embeds[-1].add_field(name=f"{entry['action']} - <t:{timestamp}:d>", value=description, inline=True)
 
-        await interaction.edit_original_response(content=None, embed=punishment_embed)
+        message_batches = []
+        current_batch = []
+        current_batch_len = 0
+
+        for embed in punishment_embeds:
+            embed_len = len(embed.title or "") + len(embed.description or "")
+            for field in embed.fields:
+                embed_len += len(field.name) + len(field.value)
+                
+            if current_batch_len + embed_len > 5500 or len(current_batch) >= 10:
+                message_batches.append(current_batch)
+                current_batch = []
+                current_batch_len = 0
+                
+            current_batch.append(embed)
+            current_batch_len += embed_len
+            
+        if current_batch:
+            message_batches.append(current_batch)
+
+        await interaction.edit_original_response(content=None, embeds=message_batches[0])
+
+        for batch in message_batches[1:]:
+            await interaction.followup.send(embeds=batch, ephemeral=True)
 
 
     @discord.ui.button(
@@ -262,13 +296,21 @@ class AppealCloseTicketButton(discord.ui.View):
             )
             return await interaction.followup.send(embed=embed, ephemeral=True)
         
-        embed = discord.Embed(
-            title=f"Appeal History for {ign}",
-            description=f"We found `{len(appeal_history)}` past appeal decision{'s' if len(appeal_history) > 1 else ''}.",
-            color=discord.Color.blue()
-        )
-        
-        for i, appeal in enumerate(appeal_history[:5]):  # Show max 5 most recent
+        appeal_embeds = []
+        for i, appeal in enumerate(appeal_history):
+            if i % 25 == 0:
+                chunk_num = (i // 25) + 1
+                title_suffix = f" (Part {chunk_num})" if len(appeal_history) > 25 else ""
+                
+                a_embed = discord.Embed(
+                    title=f"Appeal History for {ign}{title_suffix}",
+                    color=discord.Color.blue()
+                )
+                if i == 0:
+                    a_embed.description = f"We found `{len(appeal_history)}` past appeal decision{'s' if len(appeal_history) > 1 else ''}."
+                
+                appeal_embeds.append(a_embed)
+
             status_emoji = "✅" if "accept" in appeal["determination"].lower() or "accept" in appeal["info"].lower() else "❌"
             field_value = (
                 f"<t:{int(appeal['timestamp'].timestamp())}:R>\n"
@@ -278,13 +320,34 @@ class AppealCloseTicketButton(discord.ui.View):
                 f"-# **Staff:** {appeal.get('staff', 'Unknown')}\n"
                 f"-# [View Log Message]({appeal['message_url']})"
             )
-            embed.add_field(
+            appeal_embeds[-1].add_field(
                 name=f"Appeal #{i+1} - {appeal['timestamp'].strftime('%Y-%m-%d')}",
                 value=field_value,
                 inline=False
             )
         
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        message_batches = []
+        current_batch = []
+        current_batch_len = 0
+
+        for embed in appeal_embeds:
+            embed_len = len(embed.title or "") + len(embed.description or "")
+            for field in embed.fields:
+                embed_len += len(field.name) + len(field.value)
+                
+            if current_batch_len + embed_len > 5500 or len(current_batch) >= 10:
+                message_batches.append(current_batch)
+                current_batch = []
+                current_batch_len = 0
+                
+            current_batch.append(embed)
+            current_batch_len += embed_len
+            
+        if current_batch:
+            message_batches.append(current_batch)
+
+        for batch in message_batches:
+            await interaction.followup.send(embeds=batch, ephemeral=True)
 
     def parse_manual_appeal(self, text: str, ign: str, staff) -> dict:
         """Parse manual appeal entries from text"""

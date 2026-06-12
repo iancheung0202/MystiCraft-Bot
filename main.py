@@ -7,7 +7,9 @@ import logging
 import sys
 import pytz
 import aiomysql
+import os
 
+from dotenv import load_dotenv
 from discord.ext import commands
 from firebase_admin import credentials
 
@@ -21,12 +23,10 @@ from commands.onMessage import SelfRoles, RefreshStaffView
 from commands.Tickets.summary import Stats
 from commands.Utility.registration import RegistrationButtonView
 
-cred = credentials.Certificate(
-    "REMOVED"
-)
-default_app = firebase_admin.initialize_app(
-    cred, {"databaseURL": "REMOVED"}
-)
+load_dotenv()
+
+cred = credentials.Certificate(os.getenv("FIREBASE_CRED_PATH"))
+default_app = firebase_admin.initialize_app(cred, {"databaseURL": os.getenv("FIREBASE_DB_URL")})
 
 class MystiCraft(commands.Bot):
     def __init__(self):
@@ -50,20 +50,20 @@ class MystiCraft(commands.Bot):
         await bot.tree.sync()
 
         bot.tlresults_pool = await aiomysql.create_pool(
-            host='172.18.0.1',
-            port=3306,
-            user='REMOVED',
-            password='REMOVED',
-            db='REMOVED',
+            host=os.getenv("DATABASE_HOST"),
+            port=int(os.getenv("DATABASE_PORT")),
+            user=os.getenv("TLRESULTS_DB_USER"),
+            password=os.getenv("TLRESULTS_DB_PASSWORD"),
+            db=os.getenv("TLRESULTS_DB_NAME"),
             autocommit=True
         )
 
         bot.tllink_pool = await aiomysql.create_pool(
-            host='172.18.0.1',
-            port=3306,
-            user='REMOVED',
-            password='REMOVED',
-            db='REMOVED',
+            host=os.getenv("DATABASE_HOST"),
+            port=int(os.getenv("DATABASE_PORT")),
+            user=os.getenv("TLLINK_DB_USER"),
+            password=os.getenv("TLLINK_DB_PASSWORD"),
+            db=os.getenv("TLLINK_DB_NAME"),
             autocommit=True
         )
 
@@ -161,4 +161,4 @@ class MystiCraft(commands.Bot):
         self.loop.create_task(self.logging())
 
 bot = MystiCraft()
-bot.run("REMOVED")
+bot.run(os.getenv("BOT_TOKEN"))
