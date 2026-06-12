@@ -11,11 +11,13 @@ import aiomysql
 from discord.ext import commands
 from firebase_admin import credentials
 
-from commands.Tickets.tickets import CloseTicketButton, TicketAdminButtons, ConfirmCloseTicketButtons, CreateTicketButtonView, StaffAppDelete, AcceptRejectButton, ApplyForStaff, MediaAcceptRejectButton, ResolveFlagView, AppealCloseTicketButton, SelectView
+from commands.Tickets.tickets import CloseTicketButton, TicketAdminButtons, ConfirmCloseTicketButtons, CreateTicketButtonView, ResolveFlagView, SelectView
+from commands.Tickets.application import ApplicationDelete, AcceptRejectButton, ApplicationView 
+from commands.Tickets.appeals import AppealCloseTicketButton
 from commands.Tierlist.waitlist import WaitlistSelectionView, JoinQueueButtonView
 from commands.Tierlist.ht_waitlist import HTWaitlistSelectionView, ApproveDenyView, HTSkipView, FindTicketView
 from commands.Help.help import HelpPanel
-from commands.onMessage import RefreshStaffView, SelfRoles, RefreshStaffV2View
+from commands.onMessage import SelfRoles, RefreshStaffView
 from commands.Tickets.summary import Stats
 from commands.Utility.registration import RegistrationButtonView
 
@@ -68,10 +70,9 @@ class MystiCraft(commands.Bot):
         self.add_view(CloseTicketButton())
         self.add_view(TicketAdminButtons())
         self.add_view(ConfirmCloseTicketButtons())
-        self.add_view(StaffAppDelete())
+        self.add_view(ApplicationDelete())
         self.add_view(AcceptRejectButton())
-        self.add_view(MediaAcceptRejectButton())
-        self.add_view(ApplyForStaff())
+        self.add_view(ApplicationView())
         self.add_view(CreateTicketButtonView())
         self.add_view(ResolveFlagView())
         self.add_view(SelectView())
@@ -87,7 +88,6 @@ class MystiCraft(commands.Bot):
         self.add_view(Stats())
         self.add_view(AppealCloseTicketButton())
         self.add_view(RegistrationButtonView())
-        self.add_view(RefreshStaffV2View())
         self.add_view(FindTicketView())
 
     async def logging(self):
