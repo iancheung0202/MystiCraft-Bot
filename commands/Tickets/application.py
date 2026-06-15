@@ -197,7 +197,10 @@ class AcceptRejectButton(discord.ui.View):
     )
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         await check_for_manager(interaction)
-        user = interaction.guild.get_member(int(interaction.message.embeds[0].description.split("`")[1]))
+        if len(interaction.message.embeds) == 0:
+            user = interaction.guild.get_member(int(interaction.message.content.split("`")[1]))
+        else:
+            user = interaction.guild.get_member(int(interaction.message.embeds[0].description.split("`")[1]))
 
         if "staff" in interaction.message.embeds[0].title.lower():
             invite = (
@@ -235,7 +238,10 @@ class AcceptRejectButton(discord.ui.View):
     )
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
         await check_for_manager(interaction)
-        user = interaction.guild.get_member(int(interaction.message.embeds[0].description.split("`")[1]))
+        if len(interaction.message.embeds) == 0:
+            user = interaction.guild.get_member(int(interaction.message.content.split("`")[1]))
+        else:
+            user = interaction.guild.get_member(int(interaction.message.embeds[0].description.split("`")[1]))
 
         if "staff" in interaction.message.embeds[0].title.lower():
             embed = discord.Embed(
@@ -540,7 +546,7 @@ class ApplicationView(discord.ui.View):
         action_embed = discord.Embed(
             title=f"{log_title} Review Panel",
             description=f"Applicant: {interaction.user.mention} (ID: `{interaction.user.id}`)",
-            color=discord.Colour.blurple()
+            color=0x1ec7f1
         )
         
         action_embed.add_field(

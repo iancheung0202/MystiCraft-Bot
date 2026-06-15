@@ -1193,14 +1193,14 @@ class HTWaitlistCmd(commands.GroupCog, name="ht"):
                 "<:cross1:1339153202859474956> You cannot test yourself!", ephemeral=True
             )
         
-        attempted_rank = attempted_rank.name.split(" ")[0]
+        attempted_rank_str = attempted_rank.name.split(" ")[0]
         
         if not (
-            attempted_rank == "HT3"
-            or attempted_rank == "LT2"
-            or attempted_rank == "HT2"
-            or attempted_rank == "LT1"
-            or attempted_rank == "HT1"
+            attempted_rank_str == "HT3"
+            or attempted_rank_str == "LT2"
+            or attempted_rank_str == "HT2"
+            or attempted_rank_str == "LT1"
+            or attempted_rank_str == "HT1"
         ):
             return await interaction.followup.send(
                 "<:cross1:1339153202859474956> This command is only for High Tier results (HT3, LT2, HT2, LT1, HT1). Use `/waitlist results` for other ranks.",
@@ -1224,50 +1224,38 @@ class HTWaitlistCmd(commands.GroupCog, name="ht"):
         except Exception:
             pass
 
-        # === FAIL LOGIC IMPLEMENTATION ===
         override_message = None
         
         if pass_or_fail.value.lower() == "fail":
-            # Map the ATTEMPTED rank to the FALLBACK rank
             fail_map = {
                 "HT3": "LT3",
                 "HT2": "LT2",
-                "LT2": "HT3", # As per specific request
+                "LT2": "HT3",
             }
             
-            target_rank = fail_map.get(attempted_rank)
-            
-            # Construct the text message that must be sent "regardless"
-            override_message = f"<@{user.id}> - {username} - **Failed {attempted_rank} {gamemode} Test**\n\n> {scores} vs <@{tester_user.id}>"
+            target_rank = fail_map.get(attempted_rank_str)
+            override_message = f"<@{user.id}> - {username} - **Failed {attempted_rank_str} {gamemode} Test**\n\n> {scores} vs <@{tester_user.id}>"
 
             if target_rank:
-                # Find the fallback role to grant in the background
                 fallback_role_name = f"{target_rank} {gamemode}"
                 fallback_role = discord.utils.get(interaction.guild.roles, name=fallback_role_name)
                 
                 if fallback_role:
-                    # Swap the role so DB and Role Grant use the lower rank
                     attempted_rank = fallback_role
-                    # Update remarks to reflect failure in DB
-                    fail_note = f"Failed {attempted_rank} Test"
+                    fail_note = f"Failed {attempted_rank_str} Test"
                     remarks = f"{remarks} | {fail_note}" if remarks else fail_note
                 else:
                     return await interaction.followup.send(
-                        f"<:cross1:1339153202859474956> Player failed {attempted_rank}, but I could not find the fallback role `{fallback_role_name}` in the server.",
+                        f"<:cross1:1339153202859474956> Player failed {attempted_rank_str}, but I could not find the fallback role `{fallback_role_name}` in the server.",
                         ephemeral=True
                     )
             else:
-                # If they failed a rank with no mapping, we don't grant a new role, 
-                # but we still want to log the fail in DB and post the text.
-                attempted_rank = None # No role to grant
-                fail_note = f"Failed {attempted_rank} Test"
+                fail_note = f"Failed {attempted_rank_str} Test"
                 remarks = f"{remarks} | {fail_note}" if remarks else fail_note
+                attempted_rank = None 
 
-        # Determine new rank string (for DB/Embed)
-        # If attempted_rank is None (failed with no fallback), use "None"
         new_rank = attempted_rank.name.split(" ")[0] if attempted_rank else "None"
 
-        # Construct Embed (Used for Review Logs, and optionally if not overridden)
         embed = discord.Embed(title=f"{username}'s Results :trophy:")
         embed.add_field(
             name="Tester",
@@ -1327,7 +1315,6 @@ class HTWaitlistCmd(commands.GroupCog, name="ht"):
         if not results:
             return
         
-        # If we sent a text message, the jump URL might be different or standard
         await interaction.followup.send(f"<:checkmark:1339153448926580818> [High Results sent]({results.jump_url})")
 
     async def finalize_pending_results(self, message_id, interaction: discord.Interaction):

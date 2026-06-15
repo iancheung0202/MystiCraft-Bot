@@ -1,11 +1,12 @@
-import discord, time
-from discord import app_commands
-from discord.ext import commands
+import discord
+import time
 import datetime
 import pytz
+
+from discord import app_commands
+from discord.ext import commands
 from firebase_admin import db
 
-# Session cache for UI state
 user_sessions = {}
 
 def save_user_slots_to_db(user_id: int, slots: list, timezone: str):
@@ -161,7 +162,6 @@ class TimeButton(discord.ui.Button):
         view = TimeSelectView(session, self.date_str)
         await interaction.response.edit_message(content=f"Select your available hours on **{datetime.datetime.fromisoformat(self.date_str).strftime('%B %d')}** in your timezone.\n-# The interview will only take less than 30 minutes.", view=view)
 
-# ----------------- INTERVIEWER ----------------- 
 
 class ScheduleDateSelectView(discord.ui.View):
     def __init__(self, grouped: dict, applicant: discord.Member, applicant_tz: str, interviewer_tz: str):
@@ -367,8 +367,6 @@ class ScheduleCog(commands.Cog):
             view=ScheduleDateSelectView(grouped_ts, applicant, data["timezone"], target_timezone),
             ephemeral=True
         )
-
-
 
 async def setup(bot):
     await bot.add_cog(ScheduleCog(bot))

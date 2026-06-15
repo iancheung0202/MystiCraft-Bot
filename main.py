@@ -1,10 +1,12 @@
+import sys
+sys.dont_write_bytecode = True
+
 import discord
 import os
 import firebase_admin
 import datetime
 import asyncio
 import logging
-import sys
 import pytz
 import aiomysql
 import os
@@ -18,7 +20,7 @@ from commands.Tickets.application import ApplicationDelete, AcceptRejectButton, 
 from commands.Tickets.appeals import AppealCloseTicketButton
 from commands.Tierlist.waitlist import WaitlistSelectionView, JoinQueueButtonView
 from commands.Tierlist.ht_waitlist import HTWaitlistSelectionView, ApproveDenyView, HTSkipView, FindTicketView
-from commands.Help.help import HelpPanel
+# from commands.Help.help import HelpPanel
 from commands.onMessage import SelfRoles, RefreshStaffView
 from commands.Tickets.summary import Stats
 from commands.Utility.registration import RegistrationButtonView
@@ -82,7 +84,7 @@ class MystiCraft(commands.Bot):
         self.add_view(HTSkipView())
         self.add_view(ApproveDenyView())
         list = await bot.tree.fetch_commands()
-        self.add_view(HelpPanel(list))
+        # self.add_view(HelpPanel(list))
         self.add_view(RefreshStaffView())
         self.add_view(SelfRoles())
         self.add_view(Stats())

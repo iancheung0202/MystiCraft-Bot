@@ -978,7 +978,7 @@ class MentorQuizView(discord.ui.View):
 		return True
 
 	async def on_timeout(self) -> None:
-		if self.message is None or self.completed:
+		if self.message is None or self.completed or (len(self.message.embeds) > 0 and self.message.embeds[0].title == "Mentor Quiz Completed"):
 			return
 
 		for child in self.children:

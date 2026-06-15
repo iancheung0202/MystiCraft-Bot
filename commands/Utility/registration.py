@@ -1,5 +1,4 @@
 import discord
-import firebase_admin
 import datetime
 
 from firebase_admin import db

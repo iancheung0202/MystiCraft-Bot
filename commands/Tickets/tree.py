@@ -1,8 +1,6 @@
 import discord
 import re
 
-from types import SimpleNamespace
-
 from constants import SUPPORT_ROLE_IDS, SERVER_IDS, ROLE_IDS
 
 async def is_linked(user, client):
@@ -43,9 +41,10 @@ async def is_linked(user, client):
     return False, None
 
 class SupportActionButton(discord.ui.Button):
-    def __init__(self, *, label: str, custom_id: str, style: discord.ButtonStyle = discord.ButtonStyle.grey, emoji=None, opens_modal: bool = False):
+    def __init__(self, *, label: str, custom_id: str, style: discord.ButtonStyle = discord.ButtonStyle.grey, emoji=None, opens_modal: bool = False, channel: discord.TextChannel = None):
         super().__init__(label=label, style=style, emoji=emoji, custom_id=custom_id)
         self._opens_modal = opens_modal
+        self._channel = channel
 
     async def callback(self, interaction: discord.Interaction):
         entry = SUPPORT_HANDLER_REGISTRY.get(self.custom_id)
@@ -53,8 +52,10 @@ class SupportActionButton(discord.ui.Button):
             return
         handler, opens_modal = entry
 
+        current_channel = self._channel or interaction.channel
+
         if opens_modal:
-            await handler(interaction)
+            await handler(interaction, channel=current_channel)
         else:
             selected_view = discord.ui.View()
             selected_view.add_item(discord.ui.Button(label=self.label, style=self.style, emoji=self.emoji, disabled=True))
@@ -66,7 +67,7 @@ class SupportActionButton(discord.ui.Button):
                     await interaction.message.edit(view=selected_view)
                 except Exception:
                     pass
-            await handler(interaction)
+            await handler(interaction, channel=current_channel)
 
 
 class SupportChoiceView(discord.ui.View):
@@ -106,20 +107,22 @@ class SupportFormModal(discord.ui.Modal):
             except Exception:
                 pass
 
+async def owner_only(interaction: discord.Interaction) -> bool:
+    from commands.Tickets.tickets import get_ticket_owner_id
+    owner_id = get_ticket_owner_id(interaction.channel)
+    if owner_id is not None and interaction.user.id != owner_id:
+        msg = "Only the ticket opener can use these buttons."
+        if interaction.response.is_done():
+            await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(msg, ephemeral=True)
+        return False
+    return True
 
-async def post_support_outcome(
-    interaction,
-    *,
-    title: str,
-    description: str,
-    color=0x4F9EF5,
-    view=None,
-    fields=None,
-    unlock: bool = False,
-    ping_staff: bool = False,
-    ping_everyone: bool = False,
-):
-    channel = interaction.channel
+async def post_support_outcome(interaction, *, title: str, description: str, color=0x4F9EF5, view=None, fields=None, unlock: bool = False, ping_staff: bool = False, ping_everyone: bool = False, channel=None):
+    if channel is None:
+        channel = interaction.channel
+        
     from commands.Tickets.tickets import get_ticket_owner_id, CloseTicketButton
     owner_id = get_ticket_owner_id(channel)
     owner = interaction.guild.get_member(owner_id) if owner_id else interaction.user
@@ -136,461 +139,480 @@ async def post_support_outcome(
     if unlock and owner is not None:
         await channel.set_permissions(owner, send_messages=True, read_messages=True, attach_files=True)
         embed.set_footer(text="You can now type in the ticket and send any followup information")
-    
+
     content = "@everyone" if ping_everyone else (ping_role.mention if ping_role is not None else None)
     await channel.send(content=content, embed=embed, view=view)
 
 
-
-async def post_support_prompt(
-    interaction,
-    *,
-    title: str,
-    description: str,
-    view,
-    color=0x4F9EF5,
-):
-    embed = discord.Embed(title=title, description=description, color=color)
-    if _LINK_INSTRUCTIONS in description:
-        embed.set_image(url="https://media.discordapp.net/attachments/741540685852835871/1500668562178572428/Screenshot_20260503-182038.Discord.png?ex=69f94602&is=69f7f482&hm=6d563648ab50f0c3b00dcae99d02b55f6b5cbece7c2ef3131ef9b4ae2a38a136&=")
-        embed.set_footer(text="DM the code to one of these bots depending on which gamemode you use /link in")
-    await interaction.channel.send(embed=embed, view=view)
-
-async def _st_owner_only(interaction: discord.Interaction) -> bool:
-    from commands.Tickets.tickets import get_ticket_owner_id
-    owner_id = get_ticket_owner_id(interaction.channel)
-    if owner_id is not None and interaction.user.id != owner_id:
-        msg = "Only the ticket opener can use these buttons."
-        if interaction.response.is_done():
-            await interaction.followup.send(msg, ephemeral=True)
-        else:
-            await interaction.response.send_message(msg, ephemeral=True)
-        return False
-    return True
-
-
-async def _st_send_close(interaction, title: str, description: str, *, color: int = 0xFF0000):
+async def send_close_button(interaction, title: str, description: str, *, color: int = 0xFF0000, channel=None):
     from commands.Tickets.tickets import CloseTicketButton
-    await post_support_outcome(
-        interaction, title=title, description=description,
-        color=color, view=CloseTicketButton(), unlock=False, ping_staff=False,
-    )
+    await post_support_outcome(interaction, title=title, description=description, color=color, view=CloseTicketButton(), unlock=False, ping_staff=False, channel=channel)
 
 
-async def _st_send_final(interaction, title: str, description: str, data: dict, *, view=None, color: int = 0x4F9EF5, ping_everyone: bool = False):
+async def send_final(interaction, title: str, description: str, data: dict, *, view=None, color: int = 0x4F9EF5, ping_everyone: bool = False, channel=None):
     from commands.Tickets.tickets import CloseTicketButton
-    await post_support_outcome(
-        interaction, title=title, description=description,
-        color=color, view=view or CloseTicketButton(),
-        fields=list(data.items()) if data is not None else None, unlock=True, ping_staff=not ping_everyone, ping_everyone=ping_everyone,
-    )
+    await post_support_outcome(interaction, title=title, description=description, color=color, view=view or CloseTicketButton(), fields=list(data.items()) if data is not None else None, unlock=True, ping_staff=not ping_everyone, ping_everyone=ping_everyone, channel=channel)
 
 
-async def _st_send_instructions(interaction, title: str, description: str, view: discord.ui.View):
+async def send_instructions(interaction, title: str, description: str, view: discord.ui.View, channel=None):
     from commands.Tickets.tickets import CloseTicketButton
     close_view = CloseTicketButton()
     for item in close_view.children:
         view.add_item(item)
-    await post_support_prompt(interaction, title=title, description=description, view=view, color=0x4F9EF5)
+    embed = discord.Embed(title=title, description=description, color=0x4F9EF5)
+    if LINK_INSTRUCTIONS in description:
+        embed.set_image(url="https://media.discordapp.net/attachments/741540685852835871/1500668562178572428/Screenshot_20260503-182038.Discord.png?ex=69f94602&is=69f7f482&hm=6d563648ab50f0c3b00dcae99d02b55f6b5cbece7c2ef3131ef9b4ae2a38a136&=")
+        embed.set_footer(text="DM the code to one of these bots depending on which gamemode you use /link in")
+    await channel.send(embed=embed, view=view)
 
-
-_LINK_INSTRUCTIONS = (
+LINK_INSTRUCTIONS = (
     "1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n"
     "2. Use `/link` in any gamemodes (Lifesteal/Practice/Survival/Vanilla) to get a code\n"
     "3. DM the **4-digit code** to the corresponding Discord bot.\n"
     "4. Once linked, staff will reset your password within 1-3 days."
 )
 
-
-async def _st_password_reset_start(interaction):
-    linked, ign = await is_linked(interaction.user, interaction.client)
-    if linked:
-        await _st_send_final(interaction, "Password Reset",
-            f"Wow! Your account is already linked (`{ign}`). Staff will reset your password within 1–3 days.", data=None,
-            color=0x00FF00)
-    else:
-        await _st_send_instructions(interaction, "Password Reset",
-            "Your account is not linked. Can you currently log in to your account?",
-            SupportChoiceView([
-                SupportActionButton(label="Yes, I can log in",  custom_id="pr_can_login",    style=discord.ButtonStyle.green),
-                SupportActionButton(label="No, I cannot log in", custom_id="pr_cannot_login", style=discord.ButtonStyle.red),
-            ]))
-
-
-async def _st_pr_show_link_instructions(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_instructions(interaction, "Password Reset (Linking Instructions)", _LINK_INSTRUCTIONS,
-        SupportChoiceView([
-            SupportActionButton(label="I've finished linking", custom_id="pr_verify", style=discord.ButtonStyle.green),
-        ]))
-
-
-async def _st_pr_verify(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    linked, ign = await is_linked(interaction.user, interaction.client)
-    if linked:
-        await _st_send_final(interaction, "Password Reset",
-            f"Great! Your account is now linked (`{ign}`). Staff will reset your password within 1–3 days.", data=None,
-            color=0x00FF00)
-    else:
-        await _st_send_instructions(interaction, "Still Not Linked",
-            "We couldn't detect a link yet. Please try these steps again:\n\n" + _LINK_INSTRUCTIONS,
-                SupportChoiceView([
-                SupportActionButton(label="Verify Again", custom_id="pr_verify_again", style=discord.ButtonStyle.green),
-            ]))
-
-
-async def _st_pr_reject(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_close(interaction, "Password Reset",
-        "Unfortunately, verification is impossible without a prior link to your account. Please continue to play on MystiCraft with an alt account.")
-
-
-async def _st_server_questions_root(interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_instructions(interaction, "Server Questions", "Choose a topic that you need help with. If you have a question not listed here, select **Other Questions**.",
-        SupportChoiceView([
-            SupportActionButton(label="How to Link Account",              custom_id="sq_link"),
-            SupportActionButton(label="Switching from Cracked to Premium", custom_id="sq_cracked"),
-            SupportActionButton(label="Other Questions",                   custom_id="sq_other"),
-        ]))
-
-
-async def _st_sq_link(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_close(interaction, "How to Link Your Account", _LINK_INSTRUCTIONS, color=0x4F9EF5)
-
-
-async def _st_sq_cracked(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_close(interaction, "Switching from Cracked to Premium",
-        "Log in with your cracked account, run `/premium <yourpassword>`, log out, "
-        "then log back in with your premium account.\n\n"
-        "Your premium account must have the **exact same username** as your cracked "
-        "account, and the cracked account will no longer be used after migration.",
-        color=0x4F9EF5)
-
-
-async def _st_sq_other(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_instructions(interaction, "Other Questions or Issues",
-        "Are you reporting a player/staff member, reporting a bug, or appealing for a punishment?",
-        SupportChoiceView([
-            SupportActionButton(label="Yes", custom_id="sq_other_yes", style=discord.ButtonStyle.green),
-            SupportActionButton(label="No",  custom_id="sq_other_no",  style=discord.ButtonStyle.red, opens_modal=True),
-        ]))
-
-
-async def _st_sq_other_wrong_cat(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_close(interaction, "Wrong Category",
-        "You created the wrong type of ticket. Please close this ticket and create a new ticket with the correct category in <#1373881299651268710>.")
-
-
-async def _st_sq_other_modal(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    async def submit(obj, data):
-        await _st_send_final(obj, "Server Questions", "Thanks! Staff will review your question shortly.", data)
-    await interaction.response.send_modal(SupportFormModal(
-        title="Server Question",
-        fields=[("IGN", "What is your in-game name?", True), ("Question", "What would you like to ask?", True)],
-        submit_handler=submit, source_message=interaction.message,
-    ))
-
-
-async def _st_billing_root(interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_instructions(interaction, "Billing Support",
-        "Choose the billing issue that best matches your request.",
-        SupportChoiceView([
-            SupportActionButton(label="I haven't received my purchase", custom_id="billing_purchase",  opens_modal=True),
-            SupportActionButton(label="I want to request a refund",     custom_id="billing_refund",    opens_modal=True),
-            SupportActionButton(label="I want to transfer a rank",      custom_id="billing_transfer"),
-        ]))
-
-
-async def _st_billing_modal(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    async def submit(obj, data):
-        await _st_send_final(obj, "Billing Support", "Thanks! Staff will review your billing request shortly.", data)
-    await interaction.response.send_modal(SupportFormModal(
-        title="Billing Support",
-        fields=[
-            ("IGN", "What is your in-game name?", True),
-            ("Transaction ID/Email", "Transaction ID or email used", True),
-            ("Description/Reason", "Describe the issue or reason for refund", True),
-        ],
-        submit_handler=submit, source_message=interaction.message,
-    ))
-
-
-async def _st_billing_transfer(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_close(interaction, "Rank Transfer", "Purchases, ranks, and perks are **non-transferable**.")
-
-
-async def _st_appeals_root(interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_instructions(interaction, "Punishment Appeal",
-        "Choose the appeal type that matches your case. Be sincere and talk about how you were unfairly punished or deserve a second chance.",
-        SupportChoiceView([
-            SupportActionButton(label="My in-game punishment", custom_id="appeal_mc",     opens_modal=True),
-            SupportActionButton(label="My Discord punishment", custom_id="appeal_dc",     opens_modal=True),
-            SupportActionButton(label="My friend's punishment", custom_id="appeal_friend"),
-        ]))
-
-
-async def _st_appeal_minecraft(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    async def submit(obj, data):
-        from commands.Tickets.appeals import AppealCloseTicketButton
-        await _st_send_final(obj, "Minecraft Punishment Appeal",
-            "Your appeal has been submitted. Staff will review it shortly. We do not guarantee that we will accept your appeal. Our decision is final (meaning you cannot appeal your appeal decision), and you can appeal again in 14 days if it is rejected.", data, view=AppealCloseTicketButton())
-    await interaction.response.send_modal(SupportFormModal(
-        title="Minecraft Appeal",
-        fields=[
-            ("IGN", "What is your in-game name?", True),
-            ("Punishment Reason/ID", "Reason or ID of the punishment", True),
-            ("Appeal Statement", "Why should the punishment be removed?", True),
-        ],
-        submit_handler=submit, source_message=interaction.message,
-    ))
-
-
-async def _st_appeal_discord(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    async def submit(obj, data):
-        await _st_send_final(obj, "Discord Punishment Appeal",
-            "Your appeal has been submitted. Staff will review it shortly. We do not guarantee that we will accept your appeal. Our decision is final (meaning you cannot appeal your appeal decision), and you can appeal again in 14 days if it is rejected.", data)
-    await interaction.response.send_modal(SupportFormModal(
-        title="Discord Appeal",
-        fields=[
-            ("Discord Username", "Your Discord username", True),
-            ("Reason", "Reason for the punishment", True),
-            ("Appeal Statement", "Why should the punishment be removed?", True),
-        ],
-        submit_handler=submit, source_message=interaction.message,
-    ))
-
-
-async def _st_appeal_friend(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_close(interaction, "Appeal Rejected", "We do not process appeals initiated for other people.")
-
-
-async def _st_player_reports_root(interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_instructions(interaction, "Player Report", "Choose the type of behaviour you want to report.",
-        SupportChoiceView([
-            SupportActionButton(label="Cheating / Hacking",  custom_id="player_cheat"),
-            SupportActionButton(label="Chat Misbehavior",    custom_id="player_chat"),
-        ]))
-
-
-async def _st_pr_cheating(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_instructions(interaction, "Player Report (Cheating)", "Do you have clear video evidence?",
-        SupportChoiceView([
-            SupportActionButton(label="Yes", custom_id="pr_cheat_yes", style=discord.ButtonStyle.green, opens_modal=True),
-            SupportActionButton(label="No",  custom_id="pr_cheat_no",  style=discord.ButtonStyle.red),
-        ]))
-
-
-async def _st_pr_cheat_modal(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    async def submit(obj, data):
-        await _st_send_final(obj, "Player Report", "Thanks! Staff will review the report shortly. Whether or not we take action is up to the discretion of our staff.", data)
-    await interaction.response.send_modal(SupportFormModal(
-        title="Player Report",
-        fields=[
-            ("Offender IGN", "Offending player's in-game name", True),
-            ("Description", "Describe what happened", True),
-            ("Link to Video Proof", "Paste the video link", True),
-        ],
-        submit_handler=submit, source_message=interaction.message,
-    ))
-
-
-async def _st_pr_cheat_no(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_close(interaction, "Player Report",
-        "Unfortunately, without video proof we cannot take action against any players. Please try to screen record future encounters.")
-
-
-async def _st_pr_chat(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_close(interaction, "Player Report (Chat Misbehavior)",
-        "Unfortunately, our time window for chat punishments is 5 minutes, meaning "
-        "moderators are only allowed to take action on chat misbehaviour that occurred "
-        "in the last 5 minutes. By the time you created a ticket and a moderator comes "
-        "online, that window has likely passed. Therefore, **we won't process chat reports "
-        "in tickets.** Next time, you are encouraged to use the `/report` command "
-        "in-game to send moderators a notification so we can take action immediately.")
-
-
-async def _st_bug_report_root(interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_instructions(interaction, "Bug / Glitch Report", "Do you have clear video evidence?",
-        SupportChoiceView([
-            SupportActionButton(label="Yes", custom_id="bug_yes", style=discord.ButtonStyle.green),
-            SupportActionButton(label="No",  custom_id="bug_no",  style=discord.ButtonStyle.red),
-        ]))
-
-
-async def _st_bug_no_evidence(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_close(interaction, "Bug / Glitch Report",
-        "Without video proof or reproduction steps, we cannot fix bugs or restore items.")
-
-
-async def _st_bug_has_evidence(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_instructions(interaction, "Bug / Glitch Report",
-        "Choose the kind of bug report you are submitting.",
-        SupportChoiceView([
-            SupportActionButton(label="Reporting a bug (no items lost)", custom_id="bug_no_items",   opens_modal=True),
-            SupportActionButton(label="Lost items due to a bug",          custom_id="bug_lost_items", opens_modal=True),
-            SupportActionButton(label="Lost items due to lag / combat log", custom_id="bug_lag"),
-        ]))
-
-
-_BUG_FIELDS = [
+BUG_FIELDS = [
     ("IGN", "What is your in-game name?", True),
     ("Bug Description", "Describe the bug and how to reproduce it", True),
     ("Link to Video Proof of Bug", "Paste the video link", True),
 ]
 
+SUPPORT_TREE: dict[str, dict] = {
 
-async def _st_bug_no_items_modal(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    async def submit(obj, data):
-        await _st_send_final(obj, "Bug / Glitch Report", "Thanks! Our owner will review the bug report shortly.", data)
-    await interaction.response.send_modal(SupportFormModal(title="Bug Report", fields=_BUG_FIELDS,
-        submit_handler=submit, source_message=interaction.message))
-
-
-async def _st_bug_lost_items_modal(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    async def submit(obj, data):
-        await _st_send_final(obj, "Bug / Glitch Report (Item Loss)", "Thanks! Our owner will review the bug report shortly.", data)
-    await interaction.response.send_modal(SupportFormModal(title="Bug / Item Loss", fields=_BUG_FIELDS,
-        submit_handler=submit, source_message=interaction.message))
-
-
-async def _st_bug_lag(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_close(interaction, "Bug / Glitch Report",
-        "Sorry, we do not restore items lost to lag, despawns, or combat disconnects.")
-
-
-async def _st_staff_report_root(interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_instructions(interaction, "Staff Report",
-        "Did the staff member unfairly **punish** you?",
-        SupportChoiceView([
-            SupportActionButton(label="Yes", custom_id="sr_punish_yes", style=discord.ButtonStyle.green),
-            SupportActionButton(label="No",  custom_id="sr_punish_no",  style=discord.ButtonStyle.red),
-        ]))
-
-
-async def _st_sr_wrong_cat(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_close(interaction, "Staff Report",
-        "Please create an **Appeal** ticket instead. "
-        "Staff reports are for behaviour issues (e.g. racism, hacking), not punishment disputes.")
-
-
-async def _st_sr_ask_proof(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_instructions(interaction, "Staff Report", "Do you have proof of the staff member's behaviour (screenshots/videos)?",
-        SupportChoiceView([
-            SupportActionButton(label="Yes", custom_id="sr_proof_yes", style=discord.ButtonStyle.green, opens_modal=True),
-            SupportActionButton(label="No",  custom_id="sr_proof_no",  style=discord.ButtonStyle.red),
-        ]))
-
-
-async def _st_sr_modal(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    async def submit(obj, data):
-        await _st_send_final(obj, "Staff Report", "Thanks! Our managers and owners will review the report shortly.", data, ping_everyone=True)
-    await interaction.response.send_modal(SupportFormModal(
-        title="Staff Report",
-        fields=[
-            ("Your IGN", "What is your in-game name?", True),
-            ("Staff IGN", "Who are you reporting?", True),
-            ("Incident Description", "Describe what happened", True),
-            ("Proof Link", "Paste the proof link", True),
+    "password reset": {
+        "type": "dynamic",
+    },
+    "password reset can login": {
+        "type": "prompt",
+        "title": "Password Reset (Linking Instructions)",
+        "description": LINK_INSTRUCTIONS,
+        "buttons": [
+            {"label": "I've finished linking", "next": "password reset verify", "style": discord.ButtonStyle.green},
         ],
-        submit_handler=submit, source_message=interaction.message,
-    ))
+    },
+    "password reset verify": {
+        "type": "dynamic",
+    },
+    "password reset verify again": {
+        "type": "dynamic",
+    },
+    "password reset cannot login": {
+        "type": "close",
+        "title": "Password Reset",
+        "description": (
+            "Unfortunately, verification is impossible without a prior link to your account. "
+            "Please continue to play on MystiCraft with an alt account."
+        ),
+    },
 
+    "other questions": {
+        "type": "prompt",
+        "title": "Server Questions",
+        "description": "Choose a topic that you need help with. If you have a question not listed here, select **Other Questions**.",
+        "buttons": [
+            {"label": "How to Link Account",               "next": "how to link"},
+            {"label": "Switching from Cracked to Premium", "next": "switch from cracked to premium"},
+            {"label": "Other Questions",                   "next": "other issues"},
+        ],
+    },
+    "how to link": {
+        "type": "close",
+        "title": "How to Link Your Account",
+        "description": LINK_INSTRUCTIONS,
+        "color": 0x4F9EF5,
+    },
+    "switch from cracked to premium": {
+        "type": "close",
+        "title": "Switching from Cracked to Premium",
+        "description": (
+            "Log in with your cracked account, run `/premium <yourpassword>`, log out, "
+            "then log back in with your premium account.\n\n"
+            "Your premium account must have the **exact same username** as your cracked "
+            "account, and the cracked account will no longer be used after migration."
+        ),
+        "color": 0x4F9EF5,
+    },
+    "other issues": {
+        "type": "prompt",
+        "title": "Other Questions or Issues",
+        "description": "Are you reporting a player/staff member, reporting a bug, or appealing for a punishment?",
+        "buttons": [
+            {"label": "Yes", "next": "other issues yes", "style": discord.ButtonStyle.green},
+            {"label": "No",  "next": "other issues no",  "style": discord.ButtonStyle.red, "opens_modal": True},
+        ],
+    },
+    "other issues yes": {
+        "type": "close",
+        "title": "Wrong Category",
+        "description": (
+            "You created the wrong type of ticket. Please close this ticket and create a new ticket "
+            "with the correct category in <#1373881299651268710>."
+        ),
+    },
+    "other issues no": {
+        "type": "modal",
+        "modal": {
+            "title": "Server Question",
+            "fields": [
+                ("IGN",      "What is your in-game name?",  True),
+                ("Question", "What would you like to ask?", True),
+            ],
+            "result_title":       "Server Questions",
+            "result_description": "Thanks! Staff will review your question shortly.",
+        },
+    },
 
-async def _st_sr_no_proof(interaction: discord.Interaction):
-    if not await _st_owner_only(interaction): return
-    await _st_send_close(interaction, "Staff Report", "Unfortunately, we cannot investigate any staff report without concrete evidence and proof.")
+    "billing support": {
+        "type": "prompt",
+        "title": "Billing Support",
+        "description": "Choose the billing issue that best matches your request.",
+        "buttons": [
+            {"label": "I haven't received my purchase", "next": "billing purchase",  "opens_modal": True},
+            {"label": "I want to request a refund",     "next": "billing refund",    "opens_modal": True},
+            {"label": "I want to transfer a rank",      "next": "billing transfer"},
+        ],
+    },
+    "billing purchase": {
+        "type": "modal",
+        "modal": {
+            "title": "Billing Support",
+            "fields": [
+                ("IGN",                   "What is your in-game name?",             True),
+                ("Transaction ID/Email",  "Transaction ID or email used",           True),
+                ("Description/Reason",    "Describe the issue", True),
+            ],
+            "result_title":       "Billing Support",
+            "result_description": "Thanks! Staff will review your billing request shortly.",
+        },
+    },
+    "billing refund": {
+        "type": "modal",
+        "modal": {
+            "title": "Billing Support",
+            "fields": [
+                ("IGN",                   "What is your in-game name?",             True),
+                ("Transaction ID/Email",  "Transaction ID or email used",           True),
+                ("Description/Reason",    "Describe reason for refund", True),
+            ],
+            "result_title":       "Billing Support",
+            "result_description": "Thanks! Staff will review your billing request shortly.",
+        },
+    },
+    "billing transfer": {
+        "type": "close",
+        "title": "Rank Transfer",
+        "description": "Purchases, ranks, and perks are **non-transferable**.",
+    },
 
+    "punishment appeals": {
+        "type": "prompt",
+        "title": "Punishment Appeal",
+        "description": (
+            "Choose the appeal type that matches your case. Be sincere and talk about how you were "
+            "unfairly punished or deserve a second chance."
+        ),
+        "buttons": [
+            {"label": "My in-game punishment",  "next": "punishment appeal mc",     "opens_modal": True},
+            {"label": "My Discord punishment",  "next": "punishment appeal dc",     "opens_modal": True},
+            {"label": "My friend's punishment", "next": "punishment appeal friend"},
+        ],
+    },
+    "punishment appeal mc": {
+        "type": "modal",
+        "modal": {
+            "title": "Minecraft Appeal",
+            "fields": [
+                ("IGN",                  "What is your in-game name?",            True),
+                ("Punishment Reason/ID", "Reason or ID of the punishment",        True),
+                ("Appeal Statement",     "Why should the punishment be removed?", True),
+            ],
+            "result_title":       "Minecraft Punishment Appeal",
+            "result_description": (
+                "Your appeal has been submitted. Staff will review it shortly. "
+                "We do not guarantee that we will accept your appeal. Our decision is final "
+                "(meaning you cannot appeal your appeal decision), and you can appeal again "
+                "in 14 days if it is rejected."
+            ),
+            "use_appeal_close_button": True,
+        },
+    },
+    "punishment appeal dc": {
+        "type": "modal",
+        "modal": {
+            "title": "Discord Appeal",
+            "fields": [
+                ("Discord Username",  "Your Discord username",                    True),
+                ("Reason",           "Reason for the punishment",                 True),
+                ("Appeal Statement", "Why should the punishment be removed?",     True),
+            ],
+            "result_title":       "Discord Punishment Appeal",
+            "result_description": (
+                "Your appeal has been submitted. Staff will review it shortly. "
+                "We do not guarantee that we will accept your appeal. Our decision is final "
+                "(meaning you cannot appeal your appeal decision), and you can appeal again "
+                "in 14 days if it is rejected."
+            ),
+        },
+    },
+    "punishment appeal friend": {
+        "type": "close",
+        "title": "Appeal Rejected",
+        "description": "We do not process appeals initiated for other people.",
+    },
 
-# Registry: custom_id → (handler, opens_modal) 
-SUPPORT_HANDLER_REGISTRY: dict[str, tuple] = {
-    # Password reset
-    "pr_can_login":       (_st_pr_show_link_instructions, False),
-    "pr_cannot_login":    (_st_pr_reject,                 False),
-    "pr_verify":          (_st_pr_verify,                 False),
-    "pr_verify_again":    (_st_pr_verify,                 False),
-    # Server questions
-    "sq_link":            (_st_sq_link,            False),
-    "sq_cracked":         (_st_sq_cracked,         False),
-    "sq_other":           (_st_sq_other,           False),
-    "sq_other_yes":       (_st_sq_other_wrong_cat, False),
-    "sq_other_no":        (_st_sq_other_modal,     True),
-    # Billing
-    "billing_purchase":   (_st_billing_modal,    True),
-    "billing_refund":     (_st_billing_modal,    True),
-    "billing_transfer":   (_st_billing_transfer, False),
-    # Appeals
-    "appeal_mc":          (_st_appeal_minecraft, True),
-    "appeal_dc":          (_st_appeal_discord,   True),
-    "appeal_friend":      (_st_appeal_friend,    False),
-    # Player reports
-    "player_cheat":       (_st_pr_cheating,    False),
-    "player_chat":        (_st_pr_chat,        False),
-    "pr_cheat_yes":       (_st_pr_cheat_modal, True),
-    "pr_cheat_no":        (_st_pr_cheat_no,    False),
-    # Bug reports
-    "bug_yes":            (_st_bug_has_evidence,    False),
-    "bug_no":             (_st_bug_no_evidence,     False),
-    "bug_no_items":       (_st_bug_no_items_modal,  True),
-    "bug_lost_items":     (_st_bug_lost_items_modal, True),
-    "bug_lag":            (_st_bug_lag,             False),
-    # Staff reports
-    "sr_punish_yes":      (_st_sr_wrong_cat,  False),
-    "sr_punish_no":       (_st_sr_ask_proof,  False),
-    "sr_proof_yes":       (_st_sr_modal,      True),
-    "sr_proof_no":        (_st_sr_no_proof,   False),
+    "player reports": {
+        "type": "prompt",
+        "title": "Player Report",
+        "description": "Choose the type of behaviour you want to report.",
+        "buttons": [
+            {"label": "Cheating / Hacking", "next": "player report cheat"},
+            {"label": "Chat Misbehavior",   "next": "player report chat"},
+        ],
+    },
+    "player report cheat": {
+        "type": "prompt",
+        "title": "Player Report (Cheating)",
+        "description": "Do you have clear video evidence?",
+        "buttons": [
+            {"label": "Yes", "next": "player report cheat video", "style": discord.ButtonStyle.green, "opens_modal": True},
+            {"label": "No",  "next": "player report cheat no video",  "style": discord.ButtonStyle.red},
+        ],
+    },
+    "player report cheat video": {
+        "type": "modal",
+        "modal": {
+            "title": "Player Report",
+            "fields": [
+                ("Offender IGN",       "Offending player's in-game name", True),
+                ("Description",        "Describe what happened",           True),
+                ("Link to Video Proof", "Paste the video link",            True),
+            ],
+            "result_title":       "Player Report",
+            "result_description": (
+                "Thanks! Staff will review the report shortly. "
+                "Whether or not we take action is up to the discretion of our staff."
+            ),
+        },
+    },
+    "player report cheat no video": {
+        "type": "close",
+        "title": "Player Report",
+        "description": (
+            "Unfortunately, without video proof we cannot take action against any players. "
+            "Please try to screen record future encounters."
+        ),
+    },
+    "player report chat": {
+        "type": "close",
+        "title": "Player Report (Chat Misbehavior)",
+        "description": (
+            "Unfortunately, our time window for chat punishments is 5 minutes, meaning "
+            "moderators are only allowed to take action on chat misbehaviour that occurred "
+            "in the last 5 minutes. By the time you created a ticket and a moderator comes "
+            "online, that window has likely passed. Therefore, **we won't process chat reports "
+            "in tickets.** Next time, you are encouraged to use the `/report` command "
+            "in-game to send moderators a notification so we can take action immediately."
+        ),
+    },
+
+    "bug/glitch reports": {
+        "type": "prompt",
+        "title": "Bug / Glitch Report",
+        "description": "Do you have clear video evidence?",
+        "buttons": [
+            {"label": "Yes", "next": "bug video", "style": discord.ButtonStyle.green},
+            {"label": "No",  "next": "bug no video",  "style": discord.ButtonStyle.red},
+        ],
+    },
+    "bug video": {
+        "type": "prompt",
+        "title": "Bug / Glitch Report",
+        "description": "Choose the kind of bug report you are submitting.",
+        "buttons": [
+            {"label": "Reporting a bug (no items lost)",    "next": "bug no items lost",   "opens_modal": True},
+            {"label": "Lost items due to a bug",            "next": "bug lost items", "opens_modal": True},
+            {"label": "Lost items due to lag / combat log", "next": "bug lag"},
+        ],
+    },
+    "bug no video": {
+        "type": "close",
+        "title": "Bug / Glitch Report",
+        "description": "Without video proof or reproduction steps, we cannot fix bugs or restore items.",
+    },
+    "bug no items lost": {
+        "type": "modal",
+        "modal": {
+            "title": "Bug Report",
+            "fields": BUG_FIELDS,
+            "result_title":       "Bug / Glitch Report",
+            "result_description": "Thanks! Our owner will review the bug report shortly.",
+        },
+    },
+    "bug lost items": {
+        "type": "modal",
+        "modal": {
+            "title": "Bug / Item Loss",
+            "fields": BUG_FIELDS,
+            "result_title":       "Bug / Glitch Report (Item Loss)",
+            "result_description": "Thanks! Our owner will review the bug report shortly.",
+        },
+    },
+    "bug lag": {
+        "type": "close",
+        "title": "Bug / Glitch Report",
+        "description": "Sorry, we do not restore items lost to lag, despawns, or combat disconnects.",
+    },
+
+    "staff reports": {
+        "type": "prompt",
+        "title": "Staff Report",
+        "description": "Did the staff member unfairly **punish** you?",
+        "buttons": [
+            {"label": "Yes", "next": "staff punish", "style": discord.ButtonStyle.green},
+            {"label": "No",  "next": "staff punish no",  "style": discord.ButtonStyle.red},
+        ],
+    },
+    "staff punish": {
+        "type": "close",
+        "title": "Staff Report",
+        "description": (
+            "Please create an **Appeal** ticket instead. "
+            "Staff reports are for behaviour issues (e.g. racism, hacking), not punishment disputes."
+        ),
+    },
+    "staff punish no": {
+        "type": "prompt",
+        "title": "Staff Report",
+        "description": "Do you have proof of the staff member's behaviour (screenshots/videos)?",
+        "buttons": [
+            {"label": "Yes", "next": "staff proof yes", "style": discord.ButtonStyle.green, "opens_modal": True},
+            {"label": "No",  "next": "staff proof no",  "style": discord.ButtonStyle.red},
+        ],
+    },
+    "staff proof yes": {
+        "type": "modal",
+        "modal": {
+            "title": "Staff Report",
+            "fields": [
+                ("Your IGN",             "What is your in-game name?",    True),
+                ("Staff IGN",            "Who are you reporting?",         True),
+                ("Incident Description", "Describe what happened",         True),
+                ("Proof Link",           "Paste the proof link",           True),
+            ],
+            "result_title":       "Staff Report",
+            "result_description": "Thanks! Our managers and owners will review the report shortly.",
+            "ping_everyone":      True,
+        },
+    },
+    "staff proof no": {
+        "type": "close",
+        "title": "Staff Report",
+        "description": "Unfortunately, we cannot investigate any staff report without concrete evidence and proof.",
+    },
 }
 
-async def start_support_tree(
-    interaction: discord.Interaction,
-    ticket_channel: discord.TextChannel,
-    selected_key: str,
-):
-    # Wrap in a SimpleNamespace so helpers can use .channel / .guild / etc.
-    ns = SimpleNamespace( channel=ticket_channel, guild=interaction.guild, client=interaction.client, user=interaction.user)
-    key = selected_key.lower()
-    if "password" in key:
-        await _st_password_reset_start(ns)
-    elif "question" in key:
-        await _st_server_questions_root(ns)
-    elif "billing" in key:
-        await _st_billing_root(ns)
-    elif "appeal" in key:
-        await _st_appeals_root(ns)
-    elif "player" in key:
-        await _st_player_reports_root(ns)
-    elif "bug" in key:
-        await _st_bug_report_root(ns)
-    elif "staff" in key:
-        await _st_staff_report_root(ns)
+async def dispatch_node(interaction: discord.Interaction, node_id: str, channel: discord.TextChannel = None):
+    if channel is None:
+        channel = interaction.channel
+        
+    node = SUPPORT_TREE.get(node_id)
+    if node is None:
+        print(f"Error: No node found for id {node_id}")
+        return
+
+    kind = node["type"]
+
+    if kind == "dynamic":
+        handler = DYNAMIC_HANDLERS.get(node_id)
+        if handler:
+            await handler(interaction, channel)
+        return
+
+    if (kind == "prompt"):
+        buttons = []
+        for btn in node.get("buttons", []):
+            buttons.append(SupportActionButton(label=btn["label"], custom_id=btn["next"], style=btn.get("style", discord.ButtonStyle.grey), opens_modal=btn.get("opens_modal", False), channel=channel))
+        view = SupportChoiceView(buttons)
+        await send_instructions(interaction, title=node["title"], description=node["description"], view=view, channel=channel)
+    elif (kind == "close"):
+        await send_close_button(interaction, node["title"], node["description"], color=node.get("color", 0xFF0000), channel=channel)
+    elif (kind == "final"):
+        await send_final(interaction, node["title"], node["description"], data=node.get("data"), color=node.get("color", 0x4F9EF5), ping_everyone=node.get("ping_everyone", False), channel=channel)
+    elif (kind == "modal"):
+        cfg = node["modal"]
+        async def submit(obj, data, _cfg=cfg, current_channel=channel):
+            view = None
+            if _cfg.get("use_appeal_close_button"):
+                from commands.Tickets.appeals import AppealCloseTicketButton
+                view = AppealCloseTicketButton()
+            await send_final(obj, _cfg["result_title"], _cfg["result_description"], data, view=view, ping_everyone=_cfg.get("ping_everyone", False), channel=current_channel)
+        await interaction.response.send_modal(SupportFormModal(title=cfg["title"], fields=cfg["fields"], submit_handler=submit, source_message=interaction.message))
+
+async def password_reset_start(interaction, channel):
+    linked, ign = await is_linked(interaction.user, interaction.client)
+    if linked:
+        await send_final(
+            interaction, "Password Reset",
+            f"Wow! Your account is already linked (`{ign}`). Staff will reset your password within 1–3 days.",
+            data=None, color=0x00FF00, channel=channel
+        )
+    else:
+        await dispatch_node(interaction, "password reset can login", channel=channel)
+
+async def password_reset_verify(interaction, channel):
+    if not await owner_only(interaction):
+        return
+    linked, ign = await is_linked(interaction.user, interaction.client)
+    if linked:
+        await send_final(
+            interaction, "Password Reset",
+            f"Great! Your account is now linked (`{ign}`). Staff will reset your password within 1–3 days.",
+            data=None, color=0x00FF00, channel=channel
+        )
+    else:
+        await send_instructions(
+            interaction, "Still Not Linked",
+            "We couldn't detect a link yet. Please try these steps again:\n\n" + LINK_INSTRUCTIONS,
+            SupportChoiceView([
+                SupportActionButton(label="Verify Again", custom_id="password reset verify again", style=discord.ButtonStyle.green),
+            ]), channel=channel
+        )
+
+DYNAMIC_HANDLERS = {
+    "password reset": password_reset_start,
+    "password reset verify": password_reset_verify,
+    "password reset verify again": password_reset_verify,
+}
+
+def build_registry() -> dict[str, tuple]:
+    registry: dict[str, tuple] = {}
+
+    def register(node_id: str):
+        node = SUPPORT_TREE[node_id]
+        opens_modal = node["type"] == "modal"
+        
+        async def handler(interaction: discord.Interaction, channel=None, node_id=node_id):
+            if not await owner_only(interaction):
+                return
+            await dispatch_node(interaction, node_id, channel=channel)
+            
+        registry[node_id] = (handler, opens_modal)
+        for btn in node.get("buttons", []):
+            child_id = btn["next"]
+            if child_id not in registry and child_id in SUPPORT_TREE:
+                register(child_id)
+
+    for root_id in ("password reset", "other questions", "billing support", "punishment appeals", "player reports", "bug/glitch reports", "staff reports"):
+        register(root_id)
+
+    return registry
+
+SUPPORT_HANDLER_REGISTRY: dict[str, tuple] = build_registry()
+
+async def start_support_tree(interaction: discord.Interaction, ticket_channel: discord.TextChannel, selected_key: str):
+    print(f"Starting support tree with key {selected_key} in channel {ticket_channel.id}")
+    await dispatch_node(interaction, selected_key, channel=ticket_channel)
 
 class TicketQuestionsModal(discord.ui.Modal, title="Ticket Information"):
     def __init__(self, category: str):
@@ -653,14 +675,9 @@ class TicketQuestionsModal(discord.ui.Modal, title="Ticket Information"):
                 ("Hours Per Week", "How many hours per week can you dedicate?", True),
             ],
         }
-        
+
         for field in questions.get(category, []):
-            self.add_item(discord.ui.TextInput(
-                label=field[1],
-                placeholder=field[0],
-                required=field[2],
-                custom_id=field[0]
-            ))
+            self.add_item(discord.ui.TextInput(label=field[1],placeholder=field[0],required=field[2],custom_id=field[0]))
 
     async def on_submit(self, interaction: discord.Interaction):
         self.answers = {item.custom_id: item.value for item in self.children}
@@ -671,7 +688,7 @@ async def setup(bot):
     all_ids = list(SUPPORT_HANDLER_REGISTRY.keys())
     for i in range(0, len(all_ids), 25):
         chunk = all_ids[i:i + 25]
-        persistent_view = SupportChoiceView() 
+        persistent_view = SupportChoiceView()
         for custom_id in chunk:
             persistent_view.add_item(SupportActionButton(label="Ghost", custom_id=custom_id))
         bot.add_view(persistent_view)

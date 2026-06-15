@@ -274,7 +274,7 @@ class CreateTicketButton(discord.ui.Button):
             
         if guild_id == SERVER_IDS["support"]:
             from commands.Tickets.tree import start_support_tree
-            await start_support_tree(interaction, chn, category_raw)
+            await start_support_tree(interaction, chn, category_name)
                 
         await correct_interaction.followup.send(content=f"Ticket created at <#{chn.id}>.", ephemeral=True)
         cooldown_ref.set(int(interaction.created_at.timestamp()))

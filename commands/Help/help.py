@@ -1,4 +1,3 @@
-import sys
 import platform
 import psutil
 import discord
@@ -7,7 +6,7 @@ import firebase_admin
 from discord import app_commands
 from discord.ext import commands
 from discord.ui import Button, View
-from firebase_admin import credentials, db
+from firebase_admin import db
 
 class Select(discord.ui.Select):
     def __init__(self, commands_list):
@@ -16,6 +15,10 @@ class Select(discord.ui.Select):
         utility = ""
         ticket = ""
         waitlist = ""
+        registration = ""
+        application = ""
+        events = ""
+        staff = ""
 
         for command in self.commands_list:
             # Ticket commands
@@ -34,22 +37,100 @@ class Select(discord.ui.Select):
                         )
 
             # Waitlist commands
-            elif "waitlist" in command.name:
+            elif any(x in command.name for x in ["waitlist", "rep", "tier", "ht "]):
                 for subcommand in command.options:
                     if subcommand.type == discord.AppCommandOptionType.subcommand:
                         waitlist += (
-                            f"\n\n</{command.name} {subcommand.name}:{command.id}>\n"
+                            f"\n</{command.name} {subcommand.name}:{command.id}>\n"
                             f"<:reply:1036792837821435976> {subcommand.description}"
                         )
                     else:
                         waitlist += (
+                            f"\n<:blank:1036792889121980426>"
+                            f"<:reply:1036792837821435976> "
+                            f"`{subcommand.name}` - {subcommand.description}"
+                        )
+
+            # Registration commands
+            elif "registration" in command.name:
+                for subcommand in command.options:
+                    if subcommand.type == discord.AppCommandOptionType.subcommand:
+                        registration += (
+                            f"\n\n</{command.name} {subcommand.name}:{command.id}>\n"
+                            f"<:reply:1036792837821435976> {subcommand.description}"
+                        )
+                        for option in subcommand.options:
+                            waitlist += (
+                                f"\n<:blank:1036792889121980426>"
+                                f"<:reply:1036792837821435976> "
+                                f"`{option.name}` - {option.description}"
+                            )
+                    else:
+                        registration += (
                             f"\n\n<:blank:1036792889121980426>"
                             f"<:reply:1036792837821435976> "
                             f"`{subcommand.name}` - {subcommand.description}"
                         )
 
+            # Event commands
+            elif any(x in command.name for x in ["event", "lb", "inventory", "shop", "buy", "customize"]):
+                for subcommand in command.options:
+                    if subcommand.type == discord.AppCommandOptionType.subcommand:
+                        events += (
+                            f"\n</{command.name} {subcommand.name}:{command.id}>\n"
+                            f"<:reply:1036792837821435976> {subcommand.description}"
+                        )
+                        for option in subcommand.options:
+                            events += (
+                                f"\n<:blank:1036792889121980426>"
+                                f"<:reply:1036792837821435976> "
+                                f"`{option.name}` - {option.description}"
+                            )
+                    else:
+                        events += (
+                            f"\n<:blank:1036792889121980426>"
+                            f"<:reply:1036792837821435976> "
+                            f"`{subcommand.name}` - {subcommand.description}"
+                        )
+
+            # Staff only commands
+            elif any(x in command.name for x in ["stats", "history", "mentor", "reload", "handbook", "database"]):
+                for subcommand in command.options:
+                    if subcommand.type == discord.AppCommandOptionType.subcommand:
+                        staff += (
+                            f"\n</{command.name} {subcommand.name}:{command.id}>\n"
+                            f"<:reply:1036792837821435976> {subcommand.description}"
+                        )
+                    else:
+                        staff += (
+                            f"\n<:blank:1036792889121980426>"
+                            f"<:reply:1036792837821435976> "
+                            f"`{subcommand.name}` - {subcommand.description}"
+                        )
+
+            # Application commands
+            elif any(x in command.name for x in ["application", "schedule"]):
+                for subcommand in command.options:
+                    if subcommand.type == discord.AppCommandOptionType.subcommand:
+                        application += (
+                            f"\n</{command.name} {subcommand.name}:{command.id}>\n"
+                            f"<:reply:1036792837821435976> {subcommand.description}"
+                        )
+                        for option in subcommand.options:
+                            application += (
+                                f"\n<:blank:1036792889121980426>"
+                                f"<:reply:1036792837821435976> "
+                                f"`{option.name}` - {option.description}"
+                            )
+                    else:
+                        application += (
+                            f"\n<:blank:1036792889121980426>"
+                            f"<:reply:1036792837821435976> "
+                            f"`{subcommand.name}` - {subcommand.description}"
+                        )
+
             # Utility commands
-            else:
+            elif "Edit Embed" not in command.name:
                 utility += (
                     f"\n\n{command.mention}\n"
                     f"<:reply:1036792837821435976> {command.description}"
@@ -79,25 +160,44 @@ class Select(discord.ui.Select):
                 utility,
                 "Utility Commands",
                 "🛠️",
-                "The following slash commands are used for basic functions that many bots "
-                "offer. These commands are accessible to everyone in the server."
+                ""
             ],
             [
                 ticket,
                 "Ticket System",
                 "🎫",
-                "The following commands are used to setup and deal with tickets. To start "
-                "using tickets instantly, use </ticket setup:1078362594705948760>. "
-                "Note that these commands are only available to members with Administrator "
-                "permission."
+                ""
             ],
             [
                 waitlist,
-                "Waitlist System",
+                "Tierlist System",
                 "👥",
-                "**This function only works in MystiCraft Tierlist server**. Do not enable "
-                "this function in other servers. Refer to <#1338547476897992826>."
+                ""
             ],
+            [
+                staff,
+                "Staff-only",
+                "🛡️",
+                ""
+            ],
+            [
+                application,
+                "Applications and Scheduling",
+                "📋",
+                ""
+            ],
+            [
+                events,
+                "Event Commands",
+                "🎉",
+                ""
+            ],
+            [
+                registration,
+                "Registration System",
+                "📝",
+                ""
+            ]
         ]
 
         options = [
@@ -121,6 +221,7 @@ class Select(discord.ui.Select):
                     description=section[3],
                     color=0xFFFF00,
                 )
+                print(section[0])
                 body = discord.Embed(
                     description=section[0],
                     color=discord.Color.blurple(),
@@ -159,8 +260,7 @@ class HelpPanel(View):
         embed = discord.Embed(
             title="MystiCraft Help",
             description=(
-                "MystiCraft Core is a versatile Discord bot offering utility, moderation, "
-                "and ticket commands to enhance server functionality and support."
+                "MystiCraft Core is the official Discord bot for utility, moderation, tickets, tierlist, and many utility commands. Use the dropdown menu below to browse commands by category."
             ),
             color=0x1DBCEB,
         )
@@ -291,8 +391,7 @@ class Help(commands.Cog):
         embed = discord.Embed(
             title="MystiCraft Help",
             description=(
-                "MystiCraft Core is a versatile Discord bot offering utility, moderation, "
-                "and ticket commands to improve your server experience."
+                "MystiCraft Core is the official Discord bot for utility, moderation, tickets, tierlist, and many utility commands. Use the dropdown menu below to browse commands by category."
             ),
             color=0x1DBCEB,
         )
