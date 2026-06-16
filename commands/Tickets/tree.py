@@ -160,23 +160,11 @@ async def send_instructions(interaction, title: str, description: str, view: dis
     for item in close_view.children:
         view.add_item(item)
     embed = discord.Embed(title=title, description=description, color=0x4F9EF5)
-    if LINK_INSTRUCTIONS in description:
+    if "`/link` in any gamemodes" in description:
         embed.set_image(url="https://media.discordapp.net/attachments/741540685852835871/1500668562178572428/Screenshot_20260503-182038.Discord.png?ex=69f94602&is=69f7f482&hm=6d563648ab50f0c3b00dcae99d02b55f6b5cbece7c2ef3131ef9b4ae2a38a136&=")
         embed.set_footer(text="DM the code to one of these bots depending on which gamemode you use /link in")
     await channel.send(embed=embed, view=view)
 
-LINK_INSTRUCTIONS = (
-    "1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n"
-    "2. Use `/link` in any gamemodes (Lifesteal/Practice/Survival/Vanilla) to get a code\n"
-    "3. DM the **4-digit code** to the corresponding Discord bot.\n"
-    "4. Once linked, staff will reset your password within 1-3 days."
-)
-
-BUG_FIELDS = [
-    ("IGN", "What is your in-game name?", True),
-    ("Bug Description", "Describe the bug and how to reproduce it", True),
-    ("Link to Video Proof of Bug", "Paste the video link", True),
-]
 
 SUPPORT_TREE: dict[str, dict] = {
 
@@ -186,9 +174,14 @@ SUPPORT_TREE: dict[str, dict] = {
     "password reset can login": {
         "type": "prompt",
         "title": "Password Reset (Linking Instructions)",
-        "description": LINK_INSTRUCTIONS,
+        "description": (
+            "1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n"
+            "2. Use `/link` in any gamemodes (Lifesteal/Practice/Survival/Vanilla) to get a code\n"
+            "3. DM the **4-digit code** to the corresponding Discord bot.\n"
+            "4. Once linked, staff will reset your password within 1-3 days."
+        ),
         "buttons": [
-            {"label": "I've finished linking", "next": "password reset verify", "style": discord.ButtonStyle.green},
+            {"label": "Yes, I've finished linking", "next": "password reset verify"},
         ],
     },
     "password reset verify": {
@@ -219,7 +212,12 @@ SUPPORT_TREE: dict[str, dict] = {
     "how to link": {
         "type": "close",
         "title": "How to Link Your Account",
-        "description": LINK_INSTRUCTIONS,
+        "description": (
+            "1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n"
+            "2. Use `/link` in any gamemodes (Lifesteal/Practice/Survival/Vanilla) to get a code\n"
+            "3. DM the **4-digit code** to the corresponding Discord bot.\n"
+            "4. Kaboom! You are now successfully linked!"
+        ),
         "color": 0x4F9EF5,
     },
     "switch from cracked to premium": {
@@ -238,8 +236,8 @@ SUPPORT_TREE: dict[str, dict] = {
         "title": "Other Questions or Issues",
         "description": "Are you reporting a player/staff member, reporting a bug, or appealing for a punishment?",
         "buttons": [
-            {"label": "Yes", "next": "other issues yes", "style": discord.ButtonStyle.green},
-            {"label": "No",  "next": "other issues no",  "style": discord.ButtonStyle.red, "opens_modal": True},
+            {"label": "Yes", "next": "other issues yes", },
+            {"label": "No",  "next": "other issues no", "opens_modal": True},
         ],
     },
     "other issues yes": {
@@ -375,8 +373,8 @@ SUPPORT_TREE: dict[str, dict] = {
         "title": "Player Report (Cheating)",
         "description": "Do you have clear video evidence?",
         "buttons": [
-            {"label": "Yes", "next": "player report cheat video", "style": discord.ButtonStyle.green, "opens_modal": True},
-            {"label": "No",  "next": "player report cheat no video",  "style": discord.ButtonStyle.red},
+            {"label": "Yes", "next": "player report cheat video", "opens_modal": True},
+            {"label": "No",  "next": "player report cheat no video"},
         ],
     },
     "player report cheat video": {
@@ -421,8 +419,8 @@ SUPPORT_TREE: dict[str, dict] = {
         "title": "Bug / Glitch Report",
         "description": "Do you have clear video evidence?",
         "buttons": [
-            {"label": "Yes", "next": "bug video", "style": discord.ButtonStyle.green},
-            {"label": "No",  "next": "bug no video",  "style": discord.ButtonStyle.red},
+            {"label": "Yes", "next": "bug video"},
+            {"label": "No",  "next": "bug no video"},
         ],
     },
     "bug video": {
@@ -444,7 +442,11 @@ SUPPORT_TREE: dict[str, dict] = {
         "type": "modal",
         "modal": {
             "title": "Bug Report",
-            "fields": BUG_FIELDS,
+            "fields": [
+                ("IGN", "What is your in-game name?", True),
+                ("Bug Description", "Describe the bug and how to reproduce it", True),
+                ("Link to Video Proof of Bug", "Paste the video link", True),
+            ],
             "result_title":       "Bug / Glitch Report",
             "result_description": "Thanks! Our owner will review the bug report shortly.",
         },
@@ -453,7 +455,11 @@ SUPPORT_TREE: dict[str, dict] = {
         "type": "modal",
         "modal": {
             "title": "Bug / Item Loss",
-            "fields": BUG_FIELDS,
+            "fields": [
+                ("IGN", "What is your in-game name?", True),
+                ("Bug Description", "Describe the bug and how to reproduce it", True),
+                ("Link to Video Proof of Bug", "Paste the video link", True),
+            ],
             "result_title":       "Bug / Glitch Report (Item Loss)",
             "result_description": "Thanks! Our owner will review the bug report shortly.",
         },
@@ -469,8 +475,8 @@ SUPPORT_TREE: dict[str, dict] = {
         "title": "Staff Report",
         "description": "Did the staff member unfairly **punish** you?",
         "buttons": [
-            {"label": "Yes", "next": "staff punish", "style": discord.ButtonStyle.green},
-            {"label": "No",  "next": "staff punish no",  "style": discord.ButtonStyle.red},
+            {"label": "Yes", "next": "staff punish"},
+            {"label": "No",  "next": "staff punish no"},
         ],
     },
     "staff punish": {
@@ -486,8 +492,8 @@ SUPPORT_TREE: dict[str, dict] = {
         "title": "Staff Report",
         "description": "Do you have proof of the staff member's behaviour (screenshots/videos)?",
         "buttons": [
-            {"label": "Yes", "next": "staff proof yes", "style": discord.ButtonStyle.green, "opens_modal": True},
-            {"label": "No",  "next": "staff proof no",  "style": discord.ButtonStyle.red},
+            {"label": "Yes", "next": "staff proof yes", "opens_modal": True},
+            {"label": "No",  "next": "staff proof no"},
         ],
     },
     "staff proof yes": {
@@ -532,7 +538,12 @@ async def dispatch_node(interaction: discord.Interaction, node_id: str, channel:
     if (kind == "prompt"):
         buttons = []
         for btn in node.get("buttons", []):
-            buttons.append(SupportActionButton(label=btn["label"], custom_id=btn["next"], style=btn.get("style", discord.ButtonStyle.grey), opens_modal=btn.get("opens_modal", False), channel=channel))
+            style = discord.ButtonStyle.grey
+            if "yes" in btn["label"].lower():
+                style = discord.ButtonStyle.green
+            elif "no" in btn["label"].lower():
+                style = discord.ButtonStyle.red
+            buttons.append(SupportActionButton(label=btn["label"], custom_id=btn["next"], style=style, opens_modal=btn.get("opens_modal", False), channel=channel))
         view = SupportChoiceView(buttons)
         await send_instructions(interaction, title=node["title"], description=node["description"], view=view, channel=channel)
     elif (kind == "close"):
@@ -573,7 +584,12 @@ async def password_reset_verify(interaction, channel):
     else:
         await send_instructions(
             interaction, "Still Not Linked",
-            "We couldn't detect a link yet. Please try these steps again:\n\n" + LINK_INSTRUCTIONS,
+            "We couldn't detect a link yet. Please try these steps again:\n\n" + (
+                "1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n"
+                "2. Use `/link` in any gamemodes (Lifesteal/Practice/Survival/Vanilla) to get a code\n"
+                "3. DM the **4-digit code** to the corresponding Discord bot.\n"
+                "4. Once linked, staff will reset your password within 1-3 days."
+            ),
             SupportChoiceView([
                 SupportActionButton(label="Verify Again", custom_id="password reset verify again", style=discord.ButtonStyle.green),
             ]), channel=channel

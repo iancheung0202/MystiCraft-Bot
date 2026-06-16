@@ -85,45 +85,51 @@ class StaffApp(commands.GroupCog, name="application"):
                 content=f"❌ Could not DM {user.mention}. They may have DMs disabled.",
                 ephemeral=True
             )
-
+    
     @app_commands.command(
         name="toggle",
-        description="Toggle the status of staff application (open/closed)"
+        description="Toggle whether a specific application should be open or closed"
     )
-    async def toggle(self, interaction: discord.Interaction) -> None:
+    @app_commands.describe(
+        server="The server to toggle the application for",
+        application="The application type to toggle"
+    )
+    @app_commands.choices(server=[
+        app_commands.Choice(name="Support Server", value="support"),
+        app_commands.Choice(name="Tierlist Server", value="tierlist")
+    ], application=[
+        app_commands.Choice(name="Staff Application", value="staff"),
+        app_commands.Choice(name="Other Application (Media/Tester)", value="other")
+    ])
+    async def toggle_application(
+        self,
+        interaction: discord.Interaction,
+        server: app_commands.Choice[str],
+        application: app_commands.Choice[str]
+    ) -> None:
         if not interaction.user.guild_permissions.administrator:
-            return await interaction.response.send_message(f":x: You do not have permission to use this command.", ephemeral=True)
-        
-        ref = db.reference("/Staff App")
-        status = ref.get()
-        staffAppStatus = "Closed"
+            return await interaction.response.send_message(
+                f":x: You do not have permission to use this command.", 
+                ephemeral=True
+            )
 
-        if status:
-            for key, value in status.items():
-                staffAppStatus = value.get("Status", "Closed")
-                db.reference("/Staff App").child(key).delete()
-                break
+        ref = db.reference(f"Application Status/{server.value}/{application.value}")
         
-        if staffAppStatus == "Open":
-            new = "Closed"
-            data = {
-                interaction.guild.name: {
-                    "Status": new,
-                }
-            }
-            for key, value in data.items():
-                ref.push().set(value)
-        else:
-            new = "Open"
-            data = {
-                interaction.guild.name: {
-                    "Status": new,
-                }
-            }
-            for key, value in data.items():
-                ref.push().set(value)
+        current_status = ref.get()
+        if current_status is None:
+            current_status = True 
+            
+        new_status = not current_status
+        ref.set(new_status)
 
-        await interaction.response.send_message(f"**Staff Application Status:** {new}")
+        status_text = "🟢 **OPEN**" if new_status else "🔴 **CLOSED**"
+        
+        embed = discord.Embed(
+            title="Application Status Updated",
+            description=f"The **{application.name}** for the **{server.name.lower()}** is now {status_text}.",
+            color=discord.Color.green() if new_status else discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 class ApplicationDelete(discord.ui.View):
     def __init__(self):
@@ -165,7 +171,7 @@ class ApplicationDelete(discord.ui.View):
         )
         embed = discord.Embed(
             title="You have been added to a ticket channel!",
-            description=f"MystiCraft Management Team has added you to this ticket channel to discuss your application** further.",
+            description=f"MystiCraft Management Team has added you to this ticket channel to discuss your application further. Please respond timely.",
             color=discord.Color.yellow(),
         )
         button = Button(
@@ -203,25 +209,43 @@ class AcceptRejectButton(discord.ui.View):
             user = interaction.guild.get_member(int(interaction.message.embeds[0].description.split("`")[1]))
 
         if "staff" in interaction.message.embeds[0].title.lower():
-            invite = (
-                await interaction.client.get_guild(SERVER_IDS["interview"])
-                .text_channels[0]
-                .create_invite(max_age=604800, max_uses=1)
-            )
-            embed = discord.Embed(
-                title="MystiCraft Staff Application Update 🎉",
-                description=(
-                    f"Thank you for applying for a staff position at **MystiCraft**! After reviewing your application, "
-                    f"we are pleased to inform you that you have **passed the application process** and are invited to an interview. 🎊\n\n"
-                    f"📌 **Please use this [one-time invite]({invite}) to join our interview server** and set up a time when you are available to talk."
-                ),
-                color=0x00FF00,
-            )
-            await user.send(content=invite, embed=embed)
+            if interaction.guild.id == SERVER_IDS["support"]:
+                invite = (
+                    await interaction.client.get_guild(SERVER_IDS["interview"])
+                    .text_channels[0]
+                    .create_invite(max_age=604800, max_uses=1)
+                )
+                embed = discord.Embed(
+                    title="MystiCraft Staff Application Update 🎉",
+                    description=(
+                        f"Thank you for applying for a staff position at **MystiCraft**! After reviewing your application, "
+                        f"we are pleased to inform you that you have **passed the application process** and are invited to an interview. 🎊\n\n"
+                        f"📌 **Please use this [one-time invite]({invite}) to join our interview server** and set up a time when you are available to talk."
+                    ),
+                    color=0x00FF00,
+                )
+                await user.send(content=invite, embed=embed)
+            else:
+                invite = (
+                    await interaction.client.get_guild(SERVER_IDS["staff"])
+                    .text_channels[0]
+                    .create_invite(max_age=604800, max_uses=1)
+                )
+                embed = discord.Embed(
+                    title="MystiTiers Staff Application Update 🎉",
+                    description=(
+                        f"Thank you for applying for a staff position at **MystiTiers**! After reviewing your application, "
+                        f"we are pleased to inform you that you have **passed the application process** and are now officially invited to our Staff Team. 🎊\n\n"
+                        f"📌 **Please use this [one-time invite]({invite}) to join our staff server**!"
+                    ),
+                    color=0x00FF00,
+                )
+                await user.send(embed=embed)
         else:
+            app_type = "media application" if interaction.guild.id == SERVER_IDS["support"] else "tierlist tester application"
             embed = discord.Embed(
                 title="You are accepted! :tada:",
-                description="Congratulations! Your media application is accepted by the server owners!",
+                description=f"Congratulations! Your {app_type} is accepted by the management team! Please check any pings you receive to receive next steps and further instructions.",
                 color=0x00FF00,
             )
             await user.send(embed=embed)
@@ -246,13 +270,14 @@ class AcceptRejectButton(discord.ui.View):
         if "staff" in interaction.message.embeds[0].title.lower():
             embed = discord.Embed(
                 title="You are rejected! :pensive:",
-                description="Thank you so much for applying for staff. We receive numerous incredible applications every single day and unfortunately, we aren't able to accept you at this time. \n\nWe are unable to give everyone who applies a specific reason for denial, but do note that the review process is a separate, manual process done one-by-one by our management team with the server owner. During the review process, there are a lot of factors that get considered for each application. \n\nDon't fret - you're always welcome to reapply in the future. In order to reapply, you'll have to wait 7 days from today. Applications sent from you during the waiting period will be ignored.\n\nOnce again, due to the high volume of applications, we're currently unable to provide any more details or specifics about the nature of your application. We really hope you're not too discouraged by the news, and remember; this decision in no way speaks to the value, joy, and belonging you bring to your community every day.",
+                description="Thank you so much for applying for staff. We receive numerous incredible applications every single day and unfortunately, we aren't able to accept you at this time. \n\nWe are unable to give everyone who applies a specific reason for denial, but do note that the review process is a separate, manual process done one-by-one by our management team with the server owner. During the review process, there are a lot of factors that get considered for each application. \n\nDon't fret - you're always welcome to reapply in the future. In order to reapply, you'll have to wait 30 days from today. Applications sent from you during the waiting period will be ignored.\n\nOnce again, due to the high volume of applications, we're currently unable to provide any more details or specifics about the nature of your application. We really hope you're not too discouraged by the news, and remember; this decision in no way speaks to the value, joy, and belonging you bring to your community every day.",
                 color=0xFF0000,
             )
         else:
+            app_type = "media application" if interaction.guild.id == SERVER_IDS["support"] else "tierlist tester application"
             embed = discord.Embed(
                 title="You are rejected! :pensive:",
-                description="Thank you so much for applying for the media position. Unfortunately, we aren't able to accept you at this time. \n\nWe are unable to give everyone who applies a specific reason for denial, but do note that the review process is a separate, manual process done one-by-one by our management team with the server owner. During the review process, there are a lot of factors that get considered for each application. \n\nDon't fret - you're always welcome to reapply in the future. In order to reapply, you'll have to wait 30 days from today. Applications sent from you during the waiting period will be ignored.\n\nWe really hope you're not too discouraged by the news, and remember; this decision in no way speaks to the value, joy, and belonging you bring to your community every day.",
+                description=f"Thank you so much for submitting your {app_type}. Unfortunately, we aren't able to accept you at this time. \n\nWe are unable to give everyone who applies a specific reason for denial, but do note that the review process is a separate, manual process done one-by-one by our management team with the server owner. During the review process, there are a lot of factors that get considered for each application. \n\nDon't fret - you're always welcome to reapply in the future. In order to reapply, you'll have to wait 30 days from today. Applications sent from you during the waiting period will be ignored.\n\nWe really hope you're not too discouraged by the news, and remember; this decision in no way speaks to the value, joy, and belonging you bring to your community every day.",
                 color=0xFF0000,
             )
             
@@ -301,117 +326,188 @@ class AcceptRejectButton(discord.ui.View):
             ephemeral=True,
         )
 
+class ApplicationCancelled(Exception):
+    pass
+
+class ApplicationButton(discord.ui.Button):
+    def __init__(self, label, style, custom_id, emoji, callback):
+        super().__init__(label=label, style=style, custom_id=custom_id, emoji=emoji)
+        self.callback_func = callback
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.callback_func(interaction)
 
 class ApplicationView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, guild_id):
         super().__init__(timeout=None)
 
-    @discord.ui.button(
-        label="Staff Application",
-        style=discord.ButtonStyle.grey,
-        custom_id="staffapp",
-        emoji="📝",
-    )
-    async def start_staff_app(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.process_application(interaction)
+        if guild_id == SERVER_IDS["support"]:
+            staff_label = "Staff Application"
+            other_label = "Media Application"
+        elif guild_id == SERVER_IDS["tierlist"]:
+            staff_label = "Staff Application"
+            other_label = "Tester Application"
 
-    @discord.ui.button(
-        label="Media Application",
-        style=discord.ButtonStyle.grey,
-        custom_id="mediaapp",
-        emoji="📝",
-    )
-    async def start_media_app(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.process_application(interaction)
+        self.add_item(
+            ApplicationButton(
+                label=staff_label,
+                style=discord.ButtonStyle.grey,
+                custom_id="staffapp",
+                emoji="📝",
+                callback=self.process_application,
+            )
+        )
+        self.add_item(
+            ApplicationButton(
+                label=other_label,
+                style=discord.ButtonStyle.grey,
+                custom_id="otherapp",
+                emoji="📝",
+                callback=self.process_application,
+            )
+        )
 
     async def process_application(self, interaction: discord.Interaction):
-        is_staff = interaction.data["custom_id"] == "staffapp"
-        
-        app_type = "staff" if is_staff else "media"
-        db_cooldown_path = "/Staff App Cooldown" if is_staff else "/Media App Cooldown"
-        category_key = "staff" if is_staff else "media"
-        log_title = "Staff Application" if is_staff else "Media Application"
-        
-        if is_staff:
-            requirements = (
-                "### <:mysticraftlogo:1263829753366974535> **Here are some of the requirements that you must fufill:**\n"
-                "*You must meet all requirements to qualify, though meeting them does not guarantee acceptance*\n\n"
-                "- You must be able to speak in calls confidently.\n"
-                "- You must have a working microphone.\n"
-                "- You must be able to screen record and screenshot on your device.\n"
-                "- You must take responsibility for your actions \n"
-                "- You must be **at least 14 years of age**.\n"
-                "- You must have a premium Minecraft account\n\n"
-                "-# If you believe you are qualified for staff member, go ahead and answer the following questions."""
-            )
-            questions = [
-                "What is your Minecraft in-game name?",
-                "What is your age?",
-                "What country do you live in and what is your timezone?",
-                "Do you have a premium Minecraft account?",
-                "How long have you been playing Minecraft?",
-                "What is your favourite realm on MystiCraft?",
-                "Do you have a working microphone, and are you able to screen share/screen record gameplay?",
-                "Do you have previous staff experience? If so, Please list them.",
-                "Do you have experience with screensharing tools (Ocean, Echo, Paladin, etc.)?",
-                "Do you have experience with world editors like WorldEdit or WorldPainter?",
-                "What is your greatest strength as a staff member?",
-                "What are your weaknesses as a staff member?",
-                "Explain what a good staff member is (50+ words).",
-                "Why do you want to become a staff member on MystiCraft, and how many hours per week can you dedicate?",
-                "Before we submit your application, are there anything else you would like us to know?"
-            ]
-        else:
-            requirements = (
-                "### <:mysticraftlogo:1263829753366974535> **Here are some of the requirements that you must fufill:**\n"
-                "*Only one requirement is needed to qualify, though meeting them does not guarantee acceptance*\n\n"
-                "- **10** average live concurrent viewers on a **Twitch** or **YouTube longform** livestream (no boosted raids)\n"
-                "- **10** average live concurrent viewers on a **TikTok** or **YouTube Shorts** livestream\n"
-                "- **500** views on a **YouTube** video\n"
-                "- **3,000** views on a **TikTok **video\n"
-                "- **3,000** views on a **YouTube** Short\n"
-                "- **1,500** views on an **Instagram** Reel\n\n"
-                "-# If you meet at least one of the above requirements, go ahead and answer the following questions."
-            )
-            questions = [
-                "On which platform are you most comfortable to make videos on? (*example: YouTube, Twitch etc.*)",
-                "Provide us with a link of the platform channel/profile you will be uploading content on.",
-                "List the amount of audience base/followers/subscribers you currently have.",
-                "What do you appreciate about our Minecraft community server, and what motivated you to apply for a media role here?",
-                "How much time can you commit to creating and managing media content for the server on a weekly basis?",
-                "Estimate your average views per long and short form video uploaded, as well as your total amount of views.",
-                "What will you create content about? Do you have any content ideas in mind that you would like to share with us?",
-                "Before we submit your application, are there anything else you would like us to know?",
-            ]
+        is_staff = "staffapp" in interaction.data["custom_id"]
+        status_ref = db.reference(f"Application Status/{'support' if interaction.guild.id == SERVER_IDS['support'] else 'tierlist'}/{'staff' if is_staff else 'other'}")
+        is_open = status_ref.get()
 
-        ref = db.reference("/Staff App")
-        status = ref.get() or {}
-        staffAppStatus = "Open"
-        for key, value in status.items():
-            staffAppStatus = value.get("Status", "Open")
+        if is_open is False:
+            return await interaction.response.send_message(
+                content="❌ Sorry! This application is currently closed. Please check back later!",
+                ephemeral=True
+            )
+        
+        if interaction.guild.id == SERVER_IDS["support"]:
+            app_type = "staff" if is_staff else "media"
+            db_cooldown_path = "/Staff App Cooldown" if is_staff else "/Media App Cooldown"
+            category_key = "staff" if is_staff else "media"
+            log_title = "Staff Application" if is_staff else "Media Application"
             
-        if staffAppStatus == "Closed":
-            return await interaction.response.send_message(f":x: {log_title} is currently **closed** for now. Stay tuned for announcements regarding {app_type} applications in <#1136672659975975056>.", ephemeral=True)
+            if is_staff:
+                requirements = (
+                    "### <:mysticraftlogo:1263829753366974535> **Here are some of the requirements that you must fufill:**\n"
+                    "*You must meet all requirements to qualify, though meeting them does not guarantee acceptance*\n\n"
+                    "- You must be able to speak in calls confidently.\n"
+                    "- You must have a working microphone.\n"
+                    "- You must be able to screen record and screenshot on your device.\n"
+                    "- You must take responsibility for your actions \n"
+                    "- You must be **at least 14 years of age**.\n"
+                    "- You must have a premium Minecraft account\n\n"
+                    "-# If you believe you are qualified for staff member, go ahead and answer the following questions."""
+                )
+                questions = [
+                    "What is your Minecraft in-game name?",
+                    "What is your age?",
+                    "What country do you live in and what is your timezone?",
+                    "Do you have a premium or cracked Minecraft account?",
+                    "How long have you been playing Minecraft?",
+                    "What is your favourite realm on MystiCraft?",
+                    "Do you have a working microphone, and are you able to screen share/screen record gameplay?",
+                    "Do you have previous staff experience? If so, Please list them.",
+                    "Do you have experience with screensharing tools (Ocean, Echo, Paladin, etc.)?",
+                    "Do you have experience with world editors like WorldEdit or WorldPainter?",
+                    "What is your greatest strength you would bring as a staff member?",
+                    "What is your biggest weakness, and how do you work on it?",
+                    "Explain what a good staff member is (50+ words).",
+                    "Why do you want to become a staff member on MystiCraft, and how many hours per week can you dedicate?",
+                    "Before we submit your application, are there anything else you would like us to know?"
+                ]
+            else:
+                requirements = (
+                    "### <:mysticraftlogo:1263829753366974535> **Here are some of the requirements that you must fufill:**\n"
+                    "*Only one requirement is needed to qualify, though meeting them does not guarantee acceptance*\n\n"
+                    "- **10** average live concurrent viewers on a **Twitch** or **YouTube longform** livestream (no boosted raids)\n"
+                    "- **10** average live concurrent viewers on a **TikTok** or **YouTube Shorts** livestream\n"
+                    "- **500** views on a **YouTube** video\n"
+                    "- **3,000** views on a **TikTok **video\n"
+                    "- **3,000** views on a **YouTube** Short\n"
+                    "- **1,500** views on an **Instagram** Reel\n\n"
+                    "-# If you meet at least one of the above requirements, go ahead and answer the following questions."
+                )
+                questions = [
+                    "On which platform are you most comfortable to make videos on? (*example: YouTube, Twitch etc.*)",
+                    "Provide us with a link of the platform channel/profile you will be uploading content on.",
+                    "List the amount of audience base/followers/subscribers you currently have.",
+                    "What do you appreciate about our Minecraft community server, and what motivated you to apply for a media role here?",
+                    "How much time can you commit to creating and managing media content for the server on a weekly basis?",
+                    "Estimate your average views per long and short form video uploaded, as well as your total amount of views.",
+                    "What will you create content about? Do you have any content ideas in mind that you would like to share with us?",
+                    "Before we submit your application, are there anything else you would like us to know?",
+                ]
+        elif interaction.guild.id == SERVER_IDS["tierlist"]:
+            app_type = "staff" if is_staff else "tester"
+            db_cooldown_path = "/Staff App Cooldown" if is_staff else "/Tester App Cooldown"
+            category_key = "staff" if is_staff else "tester"
+            log_title = "Tierlist Staff Application" if is_staff else "Tester Application"
+            
+            if is_staff:
+                requirements = (
+                    "### <:mysticraftlogo:1263829753366974535> **Here are some of the requirements that you must fufill:**\n"
+                    "*You must meet all requirements to qualify, though meeting them does not guarantee acceptance*\n\n"
+                    "- You must take responsibility for your actions \n"
+                    "- You must be **at least 14 years of age**.\n\n"
+                    "-# If you believe you are qualified for staff member, go ahead and answer the following questions."""
+                )
+                questions = [
+                    "What is your Minecraft in-game name?",
+                    "What is your age?",
+                    "What country do you live in and what is your timezone?",
+                    "Do you have a premium or cracked Minecraft account?",
+                    "How long have you been playing Minecraft?",
+                    "Why do you want to join the MystiTiers staff team? Why do you believe you would be a good fit for this position?",
+                    "Do you have previous staff experience? If so, Please list them.",
+                    "How would you handle a difficult or toxic player?",
+                    "What would you do if two players were involved in a dispute and both claimed to be correct?",
+                    "How would you respond if you witnessed another staff member breaking the rules?",
+                    "What would you do if a friend broke the rules?",
+                    "In general, how do you handle stressful situations while moderating?",
+                    "What is your greatest strength you would bring as a staff member?",
+                    "What is your biggest weakness, and how do you work on it?",
+                    "Explain what a good staff member is (50+ words).",
+                    "How many hours per week can you dedicate on MystiTiers?",
+                    "Before we submit your application, are there anything else you would like us to know?"
+                ]
+            else:
+                requirements = (
+                    "### <:mysticraftlogo:1263829753366974535> **Here are some of the requirements that you must fufill:**\n"
+                    "*You must meet all requirements to qualify, though meeting them does not guarantee acceptance*\n\n"
+                    "- You must take responsibility for your actions \n"
+                    "- You must be LT3+ in your preferred gamemode (MystiTiers, MCTiers, or PvPTiers) \n"
+                    "- You must be **at least 14 years of age**.\n\n"
+                    "-# If you believe you are qualified for tester role, go ahead and answer the following questions."""
+                )
+                questions = [
+                    "What is your Minecraft in-game name?",
+                    "What is your age?",
+                    "What country do you live in and what is your timezone?",
+                    "Do you have a premium or cracked Minecraft account?",
+                    "How long have you been playing Minecraft?",
+                    "Which gamemodes do you wish to become a tester for? (You must be LT3 in the gamemode to qualify)",
+                    "Why do you want to become a tester for MystiTiers?",
+                    "How many hours per week can you dedicate on MystiTiers?",
+                    "Before we submit your application, are there anything else you would like us to know?",
+                ]
 
         ref = db.reference(db_cooldown_path)
         ticketcooldown = ref.get() or {}
         for key, value in ticketcooldown.items():
             if value.get("User ID") == interaction.user.id:
                 LAST_CREATED = value["Timestamp"]
-                if (int(interaction.created_at.timestamp()) - int(LAST_CREATED)) < 604800 and interaction.user.id not in COOLDOWN_BYPASS_USER_IDS:
+                if (int(interaction.created_at.timestamp()) - int(LAST_CREATED)) < 30 * 86400 and interaction.user.id not in COOLDOWN_BYPASS_USER_IDS:
                     return await interaction.response.send_message(
-                        content=f"You are on a cooldown. Try again <t:{int(LAST_CREATED) + 604800}:R>",
+                        content=f"You are on a cooldown. Try again <t:{int(LAST_CREATED) + 30 * 86400}:R>",
                         ephemeral=True,
                     )
                 db.reference(db_cooldown_path).child(key).delete()
                 break
 
         try:
-            embed = discord.Embed(title=f"MystiCraft {app_type.capitalize()} Application", description=(
+            embed = discord.Embed(title=f"{'MystiCraft' if interaction.guild.id == SERVER_IDS['support'] else 'MystiTiers'} {app_type.capitalize()} Application", description=(
                 f"Hello there! Thanks for applying for {app_type} positions in our server. Please answer them as fully and accurately as possible.\n\n"
                 f"1. **Avoid using generative AI tools** and be as concise as possible.\n"
-                f"2. You can enter links in your answers, but **DO NOT upload files** directly on Discord.\n"
-                f"3. Maximum character limit per question: **`1000` characters**"
+                f"2. You can enter links in your answers, but DO NOT upload files directly on Discord.\n"
+                f"3. Maximum character limit per question: `1000` characters"
             ), color=discord.Color.blurple())
             await interaction.user.send(embed=embed)
             ableToDM = True
@@ -427,24 +523,31 @@ class ApplicationView(discord.ui.View):
 
         def check(message):
             if message.content.lower() == "cancel" and message.author == interaction.user and isinstance(message.channel, discord.DMChannel):
-                raise Exception(f"{log_title} cancelled")
+                raise ApplicationCancelled()
             return message.author == interaction.user and isinstance(message.channel, discord.DMChannel)
 
         embed = discord.Embed(description=f"{requirements} Otherwise, you may type \"cancel\" to terminate your application. Your answers will not be saved.", color=discord.Color.blurple())
         await interaction.user.send(embed=embed)
 
         answers = []
-        for index, question in enumerate(questions):
-            while True:
-                embed = discord.Embed(title=f"Question #{index + 1}", description=question, color=0xADD8E6)
-                embed.set_footer(text=cancelNotice)
-                await interaction.user.send(embed=embed)
-                answer_msg = await interaction.client.wait_for("message", check=check)
-                if len(answer_msg.content) <= 1000:
-                    answers.append(answer_msg.content)
-                    break
-                await answer_msg.reply(embed=discord.Embed(description=f"Your answer is too long (**`{len(answer_msg.content)}`** / `1000` characters). Please shorten your response and try again.", color=discord.Color.red()))
-
+        try:
+            for index, question in enumerate(questions):
+                while True:
+                    embed = discord.Embed(title=f"Question #{index + 1}", description=question, color=0xADD8E6)
+                    embed.set_footer(text=cancelNotice)
+                    await interaction.user.send(embed=embed)
+                    answer_msg = await interaction.client.wait_for("message", check=check, timeout=15*60)
+                    if len(answer_msg.content) <= 1000:
+                        answers.append(answer_msg.content)
+                        break
+                    await answer_msg.reply(embed=discord.Embed(description=f"Your answer is too long (**`{len(answer_msg.content)}`** / `1000` characters). Please shorten your response and try again.", color=discord.Color.red()))
+        except ApplicationCancelled:
+            await interaction.user.send(embed=discord.Embed(title="Application Cancelled", description="Your application has been cancelled and your answers have not been saved. If this was a mistake, feel free to start a new application just like how you did before.", color=0xFF0000))
+            return
+        except asyncio.TimeoutError:
+            await interaction.user.send(embed=discord.Embed(title="Application Timed Out", description="Your application has been cancelled due to inactivity. Your answers have not been saved. Please start a new application just like how you did before if you still wish to apply.", color=0xFF0000))
+            return
+        
         embed = discord.Embed(title="Application Submitting...", description="Hang tight... your answers are being submitted... :coffee:", color=0xFFFF00)
         waitmsg = await interaction.user.send(embed=embed)
 
@@ -466,20 +569,12 @@ class ApplicationView(discord.ui.View):
             embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
             return await interaction.followup.send(embed=embed, ephemeral=True)
 
-        category = interaction.guild.get_channel(CATEGORY_ID)
-        if interaction.guild.id == SERVER_IDS["support"]:
-            category = interaction.guild.get_channel(CATEGORY_IDS["application"][category_key])
+        category = interaction.guild.get_channel(CATEGORY_IDS[f'{interaction.guild.id} application'][category_key])
 
         chn = await interaction.guild.create_text_channel(f"{interaction.user.name}", category=category)
         await chn.edit(topic=f"Applicant ID: {interaction.user.id}")
 
-        await chn.set_permissions(interaction.guild.default_role, send_messages=False, read_messages=False, attach_files=False)
-        for rolename in ["admin", "developer", "senior_mod", "mod", "helper"]:
-            role = interaction.guild.get_role(int(ROLE_IDS[SERVER_IDS["support"]]["roles"].get(rolename)))
-            if role:
-                await chn.set_permissions(role, send_messages=False, read_messages=False, attach_files=False)
-
-        log = interaction.guild.get_channel(LOG_CHANNEL_IDS["application"])
+        log = interaction.guild.get_channel(LOG_CHANNEL_IDS[f'{interaction.guild.id} application'])
         embed = discord.Embed(
             title=log_title,
             description=f"{interaction.user.mention} submitted a new **{app_type}** application <t:{int(chn.created_at.timestamp())}:R>!",
@@ -512,7 +607,7 @@ class ApplicationView(discord.ui.View):
 
         overview_embed = discord.Embed(
             title=f"New {app_type.capitalize()} Application", 
-            description="This ticket is not visible to the applicant.", 
+            description="This ticket is not visible to the applicant. You can add them to this channel using the button below if you want to ask them follow-up questions.", 
             color=discord.Colour.gold()
         )
         overview_embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
@@ -522,6 +617,34 @@ class ApplicationView(discord.ui.View):
         overview_embed.add_field(name="Ticket Created", value=f"<t:{int(chn.created_at.timestamp())}:R>", inline=True)
         overview_embed.add_field(name="Server Joined", value=f"<t:{int(interaction.user.joined_at.timestamp())}:R>", inline=True)
         overview_embed.add_field(name="Account Created", value=f"<t:{int(interaction.user.created_at.timestamp())}:R>", inline=True)
+
+        if interaction.guild.id == SERVER_IDS["tierlist"]:
+            linked_ign = "None"
+            try:
+                async with interaction.client.tllink_pool.acquire() as conn:
+                    async with conn.cursor() as cursor:
+                        await cursor.execute("SHOW TABLES")
+                        tb_res = await cursor.fetchone()
+                        link_table = tb_res[0] if tb_res else "mystilinking"
+                        await cursor.execute(f"SELECT player_name FROM {link_table} WHERE discord_id = %s", (str(interaction.user.id),))
+                        link_res = await cursor.fetchone()
+                        if link_res:
+                            linked_ign = link_res[0]
+            except Exception as e:
+                print(f"Error fetching linked IGN for thread: {e}")
+
+            async with interaction.client.tlresults_pool.acquire() as conn:
+                async with conn.cursor() as cursor:
+                    await cursor.execute("SELECT region FROM tlresults WHERE player_user_id = %s ORDER BY timestamp DESC LIMIT 1", (interaction.user.id,))
+                    result = await cursor.fetchone()
+                    
+            recorded_region = result[0] if result else "Unknown"
+            current_rank_roles = [r for r in interaction.user.roles if any(tier in r.name for tier in ["HT", "LT"])]
+
+            overview_embed.add_field(name="Linked IGN", value=f"[{linked_ign}](https://tierlist.mysticraft.xyz/?player={linked_ign})" if linked_ign != "None" else "<:no:1036810470860013639> Not Linked", inline=True)
+            overview_embed.add_field(name="Region", value=recorded_region, inline=True)
+            overview_embed.add_field(name="Current Tiers", value=", ".join([r.mention for r in current_rank_roles]) if current_rank_roles else "None", inline=True)
+
         await chn.send(f"**Applicant: {interaction.user.mention}**", embed=overview_embed)
 
         response_embed = discord.Embed(title=f"{app_type.capitalize()} Application Responses", color=0xFFFF00)
@@ -548,15 +671,23 @@ class ApplicationView(discord.ui.View):
             description=f"Applicant: {interaction.user.mention} (ID: `{interaction.user.id}`)",
             color=0x1ec7f1
         )
+
+        if is_staff:
+            if interaction.guild.id == SERVER_IDS["support"]:
+                accept_value = "-# DMs the user an one-time invite link to the interview server. If they pass their interview, use </application accept:1459793478358667480>."
+            else:
+                accept_value = "-# DMs the user a congratulatory message with an one-time invite link to the staff server."
+        else:
+            accept_value = "-# DMs the user a congratulatory message with no additional information. You will need to onboard them properly."
         
         action_embed.add_field(
             name="Accept", 
-            value="-# DMs the user an one-time invite link to the interview server. If they pass their interview, use </application accept:1459793478358667480>." if is_staff else "-# DMs the user a congratulatory message", 
+            value=accept_value, 
             inline=True
         )
         action_embed.add_field(
             name="Reject", 
-            value="-# DMs the user a rejection message with cooldown information", 
+            value="-# DMs the user a warm rejection message, where they can reapply after 30 days.", 
             inline=True
         )
         action_embed.add_field(

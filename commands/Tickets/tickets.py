@@ -123,7 +123,6 @@ class CreateTicketButton(discord.ui.Button):
             "punishment appeals": "appeal",
             "password reset": "password_reset",
             "high testing": "high_testing",
-            "staff application": "staff_app_tierlist"
         }
         ticket_category = cooldown_map.get(category_name, "normal")
         cooldown_ref = db.reference(f"/Ticket Cooldown/{interaction.user.id}/{ticket_category}")
@@ -141,7 +140,6 @@ class CreateTicketButton(discord.ui.Button):
                     "appeal": "You can only create a new appeal ticket every 14 days.",
                     "password_reset": "You can only create a password reset ticket every 7 days.",
                     "high_testing": "You can only create a high tier testing ticket every 30 days.",
-                    "staff_app_tierlist": "You can only create a tierlist staff application ticket every 30 days."
                 }
                 msg_prefix = cooldown_messages.get(ticket_category, "You are on a cooldown.")
                 return await interaction.response.send_message(content=f"{msg_prefix} Try again <t:{next_time}:R>", ephemeral=True)
@@ -262,6 +260,7 @@ class CreateTicketButton(discord.ui.Button):
             
         elif guild_id == SERVER_IDS["support"]:
             initial_embed.set_footer(text="You cannot type in tickets before answering all the questions first.")
+            await chn.set_permissions(interaction.user, send_messages=False, read_messages=True, attach_files=True)
 
         welcome_msg = f"**{interaction.user.mention}, welcome!** {('||' + ping_role.mention + '||') if ping_role else ''}"
         
@@ -706,6 +705,26 @@ class Ticket(commands.GroupCog, name="ticket"):
             embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
+    @app_commands.command(name="close", description="Close the current ticket")
+    async def ticket_close(self, interaction: discord.Interaction) -> None:
+        if interaction.channel.topic and ":no_entry_sign:" in interaction.channel.topic:
+            embed = discord.Embed(
+                title="Ticket already closed :no_entry_sign:",
+                description="This ticket is already closed.",
+                color=0xFF0000,
+            )
+            embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+        embed = discord.Embed(
+            title="Are you sure about that?",
+            description="Only moderators and administrators can reopen the ticket.",
+            color=0xFF0000,
+        )
+        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+        await interaction.response.send_message(
+            embed=embed, view=ConfirmCloseTicketButtons(), ephemeral=True
+        )
+
     @app_commands.command(name="notify", description="Send a DM to the ticket author notifying the ticket needs their attention")
     @app_commands.describe(message="Optional message you could include in the DMs")
     async def ticket_notify(self, interaction: discord.Interaction, message: str = None) -> None:
@@ -841,7 +860,7 @@ class Ticket(commands.GroupCog, name="ticket"):
         if footer_time is not None or footer_time == True:
             embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
         from commands.Tickets.application import ApplicationView
-        await interaction.channel.send(embed=embed, view=ApplicationView())
+        await interaction.channel.send(embed=embed, view=ApplicationView(interaction.guild.id))
         embed = discord.Embed(title="✅ Custom Ticket Panel Sent", description="All members who have access to this channel can create a ticket by clicking the button below the panel!", color=0x00FF00)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 

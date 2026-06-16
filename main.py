@@ -26,6 +26,8 @@ from commands.Utility.staff import RefreshStaffView
 from commands.Tickets.summary import Stats
 from commands.Utility.registration import RegistrationButtonView
 
+from constants import SERVER_IDS
+
 load_dotenv()
 
 cred = credentials.Certificate(os.getenv("FIREBASE_CRED_PATH"))
@@ -75,7 +77,8 @@ class MystiCraft(commands.Bot):
         self.add_view(ConfirmCloseTicketButtons())
         self.add_view(ApplicationDelete())
         self.add_view(AcceptRejectButton())
-        self.add_view(ApplicationView())
+        self.add_view(ApplicationView(SERVER_IDS["support"]))
+        self.add_view(ApplicationView(SERVER_IDS["tierlist"]))
         self.add_view(CreateTicketButtonView())
         self.add_view(ResolveFlagView())
         self.add_view(SelectView())

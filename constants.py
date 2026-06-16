@@ -74,10 +74,6 @@ EMOTES = {
 }
 
 CATEGORY_IDS = {
-    "application": {
-        "staff": 1374959644727840899,
-        "media": 1374959657310748745
-    },
     SERVER_IDS["support"]: {
         "password reset": 1500604708987994342,
         "other questions": 1374959236420730890,
@@ -89,10 +85,16 @@ CATEGORY_IDS = {
     },
     SERVER_IDS["tierlist"]: {
         "general support": 1462026697024213024,
-        "tester application": 1462026742486011934,
         "high testing": 1462026779823833211,
         "tier migration": 1462026806335897725,
-        "staff application": 1462957616534655103
+    },
+    f'{SERVER_IDS["support"]} application': {
+        "staff": 1374959644727840899,
+        "media": 1374959657310748745,
+    },
+    f'{SERVER_IDS["tierlist"]} application': {
+        "staff": 1462957616534655103,
+        "tester": 1462026742486011934
     }
 }
 
@@ -140,7 +142,8 @@ SUPPORT_ROLE_IDS = {
 LOG_CHANNEL_IDS = {
     SERVER_IDS["support"]: 1374962935360782347,
     SERVER_IDS["tierlist"]: 1338567613869199462,
-    "application": 1391586125839077447
+    f'{SERVER_IDS["support"]} application': 1391586125839077447,
+    f'{SERVER_IDS["tierlist"]} application': 1516295046259802142
 }
 
 COOLDOWN_BYPASS_USER_IDS = [692254240290242601, 840972960793100309, 740750243808673895]
