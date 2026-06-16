@@ -21,7 +21,8 @@ from commands.Tickets.appeals import AppealCloseTicketButton
 from commands.Tierlist.waitlist import WaitlistSelectionView, JoinQueueButtonView
 from commands.Tierlist.ht_waitlist import HTWaitlistSelectionView, ApproveDenyView, HTSkipView, FindTicketView
 # from commands.Help.help import HelpPanel
-from commands.onMessage import SelfRoles, RefreshStaffView
+from commands.onMessage import SelfRoles
+from commands.Utility.staff import RefreshStaffView
 from commands.Tickets.summary import Stats
 from commands.Utility.registration import RegistrationButtonView
 
