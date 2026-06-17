@@ -304,15 +304,69 @@ class CloseTicketButton(discord.ui.View):
             )
             embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
             return await interaction.response.send_message(embed=embed, ephemeral=True)
+        
         embed = discord.Embed(
             title="Are you sure about that?",
             description="Only moderators and administrators can reopen the ticket.",
             color=0xFF0000,
         )
         embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
-        await interaction.response.send_message(
-            embed=embed, view=ConfirmCloseTicketButtons(), ephemeral=True
+        
+        await interaction.response.send_message(embed=embed, view=ConfirmCloseTicketButtons(interaction), ephemeral=True)
+
+
+class CloseReasonModal(discord.ui.Modal, title="Ticket Closure Reason"):
+    reason_input = discord.ui.TextInput(label="Provide your reason for closing ticket:", style=discord.TextStyle.long, max_length=400, required=True)
+
+    def __init__(self, current_view):
+        super().__init__()
+        self.current_view = current_view
+        if self.current_view.reason:
+            self.reason_input.default = self.current_view.reason
+
+    async def on_submit(self, interaction: discord.Interaction):
+        self.current_view.reason = self.reason_input.value
+        
+        embed = discord.Embed(
+            title="Are you sure about that?",
+            description=f"Only moderators and administrators can reopen the ticket.",
+            color=0xFF0000,
         )
+        embed.add_field(name="Closing Reason", value=self.reason_input.value, inline=False)
+        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+        await interaction.response.edit_message(embed=embed, view=self.current_view)
+
+
+class ConfirmCloseTicketButtons(discord.ui.View):
+    def __init__(self, original_interaction):
+        super().__init__(timeout=None)
+        self.reason = None
+        
+        if check_for_staff(original_interaction.guild, original_interaction.user):
+            reason_btn = discord.ui.Button(label="Reason", style=discord.ButtonStyle.blurple, custom_id="add_reason", row=0)
+            reason_btn.callback = self.add_reason_callback
+            self.add_item(reason_btn)
+            
+    async def add_reason_callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(CloseReasonModal(self))
+    
+    @discord.ui.button(label="Yes", style=discord.ButtonStyle.green, custom_id="yes", row=0)
+    async def yes(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            embed=discord.Embed(description="✅ Ticket Closure Confirmed", color=discord.Color.green()), 
+            view=None
+        )
+        await close_ticket(interaction, self.reason)
+
+    @discord.ui.button(label="No", style=discord.ButtonStyle.red, custom_id="no", row=0)
+    async def red(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = discord.Embed(
+            title="Action Cancelled",
+            description=f"Alright {interaction.user.mention}! I will not close the ticket!",
+            color=discord.Color.red(),
+        )
+        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+        await interaction.response.edit_message(embed=embed, view=None)
 
 
 class TicketAdminButtons(discord.ui.View):
@@ -367,7 +421,7 @@ class TicketAdminButtons(discord.ui.View):
         embed = discord.Embed(
             title="Ticket reopened",
             description=f"Your ticket is reopened.",
-            color=0xE44D41,
+            color=discord.Color.yellow(),
         )
         embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
         button = Button(
@@ -385,7 +439,7 @@ class TicketAdminButtons(discord.ui.View):
         embed = discord.Embed(
             title="🔓 Ticket Reopened",
             description="Ticket is again visible to the member.",
-            color=0xFFFF00,
+            color=discord.Color.yellow(),
         )
         embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
         await interaction.message.delete()
@@ -402,36 +456,13 @@ class TicketAdminButtons(discord.ui.View):
         embed = discord.Embed(
             title="Deleting Ticket...",
             description="Ticket will be deleted in 5 seconds",
-            color=0xFF0000,
+            color=discord.Color.red(),
         )
         embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
         await interaction.message.delete()
         await interaction.channel.send(embed=embed)
         await asyncio.sleep(5)
         await interaction.channel.delete()
-
-
-class ConfirmCloseTicketButtons(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    
-    @discord.ui.button(label="Yes", style=discord.ButtonStyle.green, custom_id="yes")
-    async def yes(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(
-            embed=discord.Embed(description="✅ Ticket Closure Confirmed", color=discord.Color.green()), 
-            view=None
-        )
-        await close_ticket(interaction)
-
-    @discord.ui.button(label="No", style=discord.ButtonStyle.red, custom_id="no")
-    async def red(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = discord.Embed(
-            title="Action Cancelled",
-            description=f"Alright {interaction.user.mention}! I will not close the ticket!",
-            color=0xFF0000,
-        )
-        embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
-        await interaction.response.edit_message(embed=embed, view=None)
 
 
 class ResolveFlagView(discord.ui.View):
@@ -715,15 +746,14 @@ class Ticket(commands.GroupCog, name="ticket"):
             )
             embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
             return await interaction.response.send_message(embed=embed, ephemeral=True)
+        
         embed = discord.Embed(
             title="Are you sure about that?",
             description="Only moderators and administrators can reopen the ticket.",
             color=0xFF0000,
         )
         embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
-        await interaction.response.send_message(
-            embed=embed, view=ConfirmCloseTicketButtons(), ephemeral=True
-        )
+        await interaction.response.send_message(embed=embed, view=ConfirmCloseTicketButtons(interaction), ephemeral=True)
 
     @app_commands.command(name="notify", description="Send a DM to the ticket author notifying the ticket needs their attention")
     @app_commands.describe(message="Optional message you could include in the DMs")

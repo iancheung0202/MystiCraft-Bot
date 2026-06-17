@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from discord.ext import commands
 from firebase_admin import credentials
 
-from commands.Tickets.tickets import CloseTicketButton, TicketAdminButtons, ConfirmCloseTicketButtons, CreateTicketButtonView, ResolveFlagView, SelectView
+from commands.Tickets.tickets import CloseTicketButton, TicketAdminButtons, CreateTicketButtonView, ResolveFlagView, SelectView
 from commands.Tickets.application import ApplicationDelete, AcceptRejectButton, ApplicationView 
 from commands.Tickets.appeals import AppealCloseTicketButton
 from commands.Tierlist.waitlist import WaitlistSelectionView, JoinQueueButtonView
@@ -74,7 +74,6 @@ class MystiCraft(commands.Bot):
 
         self.add_view(CloseTicketButton())
         self.add_view(TicketAdminButtons())
-        self.add_view(ConfirmCloseTicketButtons())
         self.add_view(ApplicationDelete())
         self.add_view(AcceptRejectButton())
         self.add_view(ApplicationView(SERVER_IDS["support"]))

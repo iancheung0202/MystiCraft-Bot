@@ -529,6 +529,8 @@ class ApplicationView(discord.ui.View):
         embed = discord.Embed(description=f"{requirements} Otherwise, you may type \"cancel\" to terminate your application. Your answers will not be saved.", color=discord.Color.blurple())
         await interaction.user.send(embed=embed)
 
+        print(f"Application started for {interaction.user} ({interaction.user.id}) - {app_type} application")
+
         answers = []
         try:
             for index, question in enumerate(questions):
@@ -543,9 +545,11 @@ class ApplicationView(discord.ui.View):
                     await answer_msg.reply(embed=discord.Embed(description=f"Your answer is too long (**`{len(answer_msg.content)}`** / `1000` characters). Please shorten your response and try again.", color=discord.Color.red()))
         except ApplicationCancelled:
             await interaction.user.send(embed=discord.Embed(title="Application Cancelled", description="Your application has been cancelled and your answers have not been saved. If this was a mistake, feel free to start a new application just like how you did before.", color=0xFF0000))
+            print(f"Application cancelled for {interaction.user} ({interaction.user.id}) - {app_type} application")
             return
         except asyncio.TimeoutError:
             await interaction.user.send(embed=discord.Embed(title="Application Timed Out", description="Your application has been cancelled due to inactivity. Your answers have not been saved. Please start a new application just like how you did before if you still wish to apply.", color=0xFF0000))
+            print(f"Application timed out for {interaction.user} ({interaction.user.id}) - {app_type} application")
             return
         
         embed = discord.Embed(title="Application Submitting...", description="Hang tight... your answers are being submitted... :coffee:", color=0xFFFF00)
@@ -717,6 +721,8 @@ class ApplicationView(discord.ui.View):
         ref = db.reference(db_cooldown_path)
         for key, value in data.items():
             ref.push().set(value)
+
+        print(f"Application submitted for {interaction.user} ({interaction.user.id}) - {app_type} application")
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(StaffApp(bot))

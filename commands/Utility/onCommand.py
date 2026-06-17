@@ -40,7 +40,6 @@ class OnCommand(commands.Cog):
 
     @commands.Cog.listener()
     async def on_app_command_completion(self, interaction, command):
-        print(interaction.data)  # Debugging prints as requested
         channel = self.client.get_channel(1030892842308091987)
         if isinstance(command, app_commands.Command):  # Slash command
             options = interaction.data.get('options', [])

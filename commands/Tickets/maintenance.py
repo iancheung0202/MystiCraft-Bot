@@ -43,19 +43,17 @@ async def delete_flags(guild, channel_id):
             pass
 
 
-async def close_ticket(interaction):
+async def close_ticket(interaction, reason=None):
     """Reusable ticket close routine."""
     channel = interaction.channel
     guild = interaction.guild
     closer = interaction.user
 
-    left = False
-    userObject = None
     try:
-        user = guild.get_member(int(channel.topic)).name
         userObject = guild.get_member(int(channel.topic))
+        left = False
     except Exception:
-        user = "[LEFT SERVER]"
+        userObject = None
         left = True
 
     ref = db.reference("/Tickets")
@@ -71,7 +69,7 @@ async def close_ticket(interaction):
     await delete_flags(guild, channel.id)
     
     from commands.Tickets.transcript import get_transcript
-    f, user, usersInvolved, staff_message_counts = await get_transcript(interaction, channel)
+    f, _, usersInvolved, staff_message_counts = await get_transcript(interaction, channel)
 
     if left == False and userObject is not None:
         embed = discord.Embed(
@@ -101,7 +99,9 @@ async def close_ticket(interaction):
     except Exception:
         ticket_topic = "Others"
     
-    embed.add_field(name="Ticket Topic", value=ticket_topic)
+    embed.add_field(name="Ticket Topic", value=ticket_topic, inline=True)
+    if reason:
+        embed.add_field(name="Closing Reason", value=reason, inline=True)
 
     log_message = None
     if log:
@@ -136,24 +136,32 @@ async def close_ticket(interaction):
     user_view = View()
     user_view.add_item(transcript_button)
 
-    embed = discord.Embed(
+    embed_dm = discord.Embed(
         title="Ticket closed",
-        description=f"Your ticket in **{guild.name}** is now closed. \n-# Visit https://ticket.mysticraft.xyz/ to see your previous tickets",
+        description=f"Your ticket in **{guild.name}** is now closed. Visit https://ticket.mysticraft.xyz/ to see your previous tickets",
         color=0xE44D41,
     )
-    embed.add_field(name="Ticket Topic", value=ticket_topic)
-    embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
-    embed.set_footer(text=f"You can always create a new ticket for additional assistance!")
+    embed_dm.add_field(name="Ticket Topic", value=ticket_topic, inline=True)
+    if reason:
+        embed_dm.add_field(name="Closing Reason", value=reason, inline=True)
+        
+    embed_dm.timestamp = datetime.datetime.now(datetime.timezone.utc)
+    embed_dm.set_footer(text=f"You can always create a new ticket for additional assistance!")
     try:
         user_member = userObject if userObject is not None else None
         if user_member:
-            await user_member.send(embed=embed, view=user_view)
+            await user_member.send(embed=embed_dm, view=user_view)
             await channel.set_permissions(user_member, send_messages=False, read_messages=False, attach_files=False)
     except Exception:
         pass
 
+    close_desc = f"Ticket is closed by {closer.mention} and is no longer visible to the member {userObject.mention if not left and userObject else 'Unknown'}"
+    closing_embed = discord.Embed(title=f"Ticket Closed", description=close_desc, color=0xE44D41)
+    if reason:
+        closing_embed.add_field(name="Closing Reason", value=reason, inline=False)
+
     try:
-        await channel.send(embed=discord.Embed(title=f"Ticket Closed", description=f"Ticket is closed by {closer.mention} and is no longer visible to the member {user.mention if not left else 'Unknown'}", color=0xE44D41))
+        await channel.send(embed=closing_embed)
     except Exception:
         pass
 

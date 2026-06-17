@@ -140,6 +140,10 @@ async def post_support_outcome(interaction, *, title: str, description: str, col
         await channel.set_permissions(owner, send_messages=True, read_messages=True, attach_files=True)
         embed.set_footer(text="You can now type in the ticket and send any followup information")
 
+    if "link" in title.lower():
+        embed.set_image(url="https://media.discordapp.net/attachments/741540685852835871/1500668562178572428/Screenshot_20260503-182038.Discord.png?ex=69f94602&is=69f7f482&hm=6d563648ab50f0c3b00dcae99d02b55f6b5cbece7c2ef3131ef9b4ae2a38a136&=")
+        embed.set_footer(text="DM the code to one of these bots depending on which gamemode you use /link in")
+
     content = "@everyone" if ping_everyone else (ping_role.mention if ping_role is not None else None)
     await channel.send(content=content, embed=embed, view=view)
 
@@ -160,16 +164,32 @@ async def send_instructions(interaction, title: str, description: str, view: dis
     for item in close_view.children:
         view.add_item(item)
     embed = discord.Embed(title=title, description=description, color=0x4F9EF5)
-    if "`/link` in any gamemodes" in description:
+    if "link" in title.lower():
         embed.set_image(url="https://media.discordapp.net/attachments/741540685852835871/1500668562178572428/Screenshot_20260503-182038.Discord.png?ex=69f94602&is=69f7f482&hm=6d563648ab50f0c3b00dcae99d02b55f6b5cbece7c2ef3131ef9b4ae2a38a136&=")
         embed.set_footer(text="DM the code to one of these bots depending on which gamemode you use /link in")
     await channel.send(embed=embed, view=view)
 
-
 SUPPORT_TREE: dict[str, dict] = {
 
     "password reset": {
-        "type": "dynamic",
+        "type": "condition",
+        "run_condition": "is_linked",
+        "if_true": {
+            "node": "final",
+            "title": "Password Reset",
+            "description": "Wow! Your account is already linked (`{ign}`). Staff will reset your password within 1-3 days.",
+            "color": 0x00FF00
+        },
+        "if_false": "password reset ask login"
+    },
+    "password reset ask login": {
+        "type": "prompt",
+        "title": "Password Reset Verification",
+        "description": "Can you currently log into the Minecraft server with this account?",
+        "buttons": [
+            {"label": "Yes, I can login", "next": "password reset can login"},
+            {"label": "No, I cannot login", "next": "password reset cannot login"},
+        ],
     },
     "password reset can login": {
         "type": "prompt",
@@ -185,10 +205,28 @@ SUPPORT_TREE: dict[str, dict] = {
         ],
     },
     "password reset verify": {
-        "type": "dynamic",
-    },
-    "password reset verify again": {
-        "type": "dynamic",
+        "type": "condition",
+        "require_owner": True,
+        "run_condition": "is_linked",
+        "if_true": {
+            "node": "final",
+            "title": "Password Reset",
+            "description": "Great! Your account is now linked (`{ign}`). Staff will reset your password within 1-3 days.",
+            "color": 0x00FF00
+        },
+        "if_false": {
+            "node": "instructions",
+            "title": "Still Not Linked",
+            "description": (
+                "We couldn't detect a link yet. Please try these steps again:\n\n"
+                "1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n"
+                "2. Use `/link` in any gamemodes to get a code\n"
+                "3. DM the **4-digit code** to the corresponding Discord bot."
+            ),
+            "buttons": [
+                {"label": "Verify Again", "next": "password reset verify", "style": "green"}
+            ]
+        }
     },
     "password reset cannot login": {
         "type": "close",
@@ -529,10 +567,35 @@ async def dispatch_node(interaction: discord.Interaction, node_id: str, channel:
 
     kind = node["type"]
 
-    if kind == "dynamic":
-        handler = DYNAMIC_HANDLERS.get(node_id)
-        if handler:
-            await handler(interaction, channel)
+    CONDITION_MAP = {
+        "is_linked": lambda i: is_linked(i.user, i.client)
+    }
+
+    if kind == "condition":
+        if node.get("require_owner") and not await owner_only(interaction):
+            return
+
+        cond_name = node.get("run_condition")
+        result, context_value = False, None
+        if cond_name in CONDITION_MAP:
+            result, context_value = await CONDITION_MAP[cond_name](interaction)
+
+        outcome = node.get("if_true") if result else node.get("if_false")
+        if isinstance(outcome, str):
+            await dispatch_node(interaction, outcome, channel=channel)
+        elif isinstance(outcome, dict):
+            target_type = outcome.get("node")
+            desc = outcome.get("description", "").format(ign=context_value)
+            
+            if target_type == "final":
+                await send_final(interaction, outcome.get("title"), desc, data=None, color=outcome.get("color", 0x4F9EF5), channel=channel)
+            elif target_type == "instructions":
+                buttons = []
+                for btn in outcome.get("buttons", []):
+                    style = discord.ButtonStyle.green if btn.get("style") == "green" else discord.ButtonStyle.grey
+                    buttons.append(SupportActionButton(label=btn["label"], custom_id=btn["next"], style=style, channel=channel))
+                
+                await send_instructions(interaction, outcome.get("title"), desc, view=SupportChoiceView(buttons), channel=channel)
         return
 
     if (kind == "prompt"):
@@ -560,52 +623,18 @@ async def dispatch_node(interaction: discord.Interaction, node_id: str, channel:
             await send_final(obj, _cfg["result_title"], _cfg["result_description"], data, view=view, ping_everyone=_cfg.get("ping_everyone", False), channel=current_channel)
         await interaction.response.send_modal(SupportFormModal(title=cfg["title"], fields=cfg["fields"], submit_handler=submit, source_message=interaction.message))
 
-async def password_reset_start(interaction, channel):
-    linked, ign = await is_linked(interaction.user, interaction.client)
-    if linked:
-        await send_final(
-            interaction, "Password Reset",
-            f"Wow! Your account is already linked (`{ign}`). Staff will reset your password within 1–3 days.",
-            data=None, color=0x00FF00, channel=channel
-        )
-    else:
-        await dispatch_node(interaction, "password reset can login", channel=channel)
-
-async def password_reset_verify(interaction, channel):
-    if not await owner_only(interaction):
-        return
-    linked, ign = await is_linked(interaction.user, interaction.client)
-    if linked:
-        await send_final(
-            interaction, "Password Reset",
-            f"Great! Your account is now linked (`{ign}`). Staff will reset your password within 1–3 days.",
-            data=None, color=0x00FF00, channel=channel
-        )
-    else:
-        await send_instructions(
-            interaction, "Still Not Linked",
-            "We couldn't detect a link yet. Please try these steps again:\n\n" + (
-                "1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n"
-                "2. Use `/link` in any gamemodes (Lifesteal/Practice/Survival/Vanilla) to get a code\n"
-                "3. DM the **4-digit code** to the corresponding Discord bot.\n"
-                "4. Once linked, staff will reset your password within 1-3 days."
-            ),
-            SupportChoiceView([
-                SupportActionButton(label="Verify Again", custom_id="password reset verify again", style=discord.ButtonStyle.green),
-            ]), channel=channel
-        )
-
-DYNAMIC_HANDLERS = {
-    "password reset": password_reset_start,
-    "password reset verify": password_reset_verify,
-    "password reset verify again": password_reset_verify,
-}
 
 def build_registry() -> dict[str, tuple]:
     registry: dict[str, tuple] = {}
 
     def register(node_id: str):
-        node = SUPPORT_TREE[node_id]
+        if node_id in registry:
+            return
+            
+        node = SUPPORT_TREE.get(node_id)
+        if not node:
+            return
+            
         opens_modal = node["type"] == "modal"
         
         async def handler(interaction: discord.Interaction, channel=None, node_id=node_id):
@@ -614,12 +643,11 @@ def build_registry() -> dict[str, tuple]:
             await dispatch_node(interaction, node_id, channel=channel)
             
         registry[node_id] = (handler, opens_modal)
+        
         for btn in node.get("buttons", []):
-            child_id = btn["next"]
-            if child_id not in registry and child_id in SUPPORT_TREE:
-                register(child_id)
+            register(btn["next"])
 
-    for root_id in ("password reset", "other questions", "billing support", "punishment appeals", "player reports", "bug/glitch reports", "staff reports"):
+    for root_id in SUPPORT_TREE.keys():
         register(root_id)
 
     return registry
