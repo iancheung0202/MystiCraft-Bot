@@ -133,6 +133,18 @@ class onMsg(commands.Cog):
             guild_list = "\n".join([f"- {g.name} (`{g.id}`)" for g in self.client.guilds])
             await message.channel.send(f"**Guilds I'm in:**\n{guild_list}")
 
+        if "mc!staff" in message.content:
+            from commands.Utility.staff import RefreshStaffView
+            embed = discord.Embed(
+                title="MystiCraft Staff Management Panel",
+                description=(
+                    "Welcome to the MystiCraft Staff Management Panel! This interface is designed to streamline staff role management across our network. "
+                    "Click the `Refresh Staff Directory` button below to synchronize staff roles and ensure everyone is in their correct positions across all servers."
+                ),
+                color=0x3779F5,
+            )
+            await message.channel.send(embed=embed, view=RefreshStaffView())
+
         if "mc!selfroles" in message.content:
             embed = discord.Embed(
                 title="✨ Choose your Ping Roles",
