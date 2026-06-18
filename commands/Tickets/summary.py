@@ -334,7 +334,8 @@ class StatsCommand(commands.GroupCog, name="stats"):
         
     @app_commands.command(name="checkup", description="Generate weekly checkups for all staff members")
     async def stats_checkup(self, interaction: discord.Interaction):
-        await check_for_manager(interaction)
+        if not await check_for_manager(interaction):
+            return await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
         await interaction.response.defer(thinking=True, ephemeral=True)
         
         role_requirements = {
@@ -609,7 +610,8 @@ class StatsCommand(commands.GroupCog, name="stats"):
         app_commands.Choice(name="Sort by Last 180 Days", value="last_180_days"),
     ])
     async def stats_tickets(self, interaction: discord.Interaction, sorting: app_commands.Choice[str]) -> None:
-        await check_for_manager(interaction)
+        if not await check_for_manager(interaction):
+            return await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
         await interaction.response.defer(ephemeral=True)
         stats = await get_all_staff_ticket_stats()
         pages = await get_staff_ticket_embeds(interaction, stats, sort_by=sorting.value, reverse=True)
@@ -627,7 +629,8 @@ class StatsCommand(commands.GroupCog, name="stats"):
         app_commands.Choice(name="Sort by Last 180 Days", value="last_180_days"),
     ])
     async def stats_testers(self, interaction: discord.Interaction, sorting: app_commands.Choice[str]) -> None:
-        await check_for_manager(interaction)
+        if not await check_for_manager(interaction):
+            return await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
         await interaction.response.defer(ephemeral=True)
         stats = await get_all_tester_stats()
         pages = await get_tester_ticket_embeds(interaction, stats, sort_by=sorting.value, reverse=True)
@@ -636,7 +639,8 @@ class StatsCommand(commands.GroupCog, name="stats"):
 
     @app_commands.command(name="punishments", description="Count staff punishment logs in the past 7 days")
     async def stats_punishments(self, interaction: discord.Interaction):
-        await check_for_manager(interaction)
+        if not await check_for_manager(interaction):
+            return await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
         await interaction.response.defer(thinking=True, ephemeral=True)
 
         channel_id = 1155910232204128256
@@ -691,7 +695,8 @@ class StatsCommand(commands.GroupCog, name="stats"):
         
     @app_commands.command(name="appeals", description="Count staff appeal actions in the last 7 days.")
     async def stats_appeals(self, interaction: discord.Interaction):
-        await check_for_manager(interaction)
+        if not await check_for_manager(interaction):
+            return await interaction.response.send_message("❌ You don't have permission to use this command.", ephemeral=True)
         await interaction.response.defer(thinking=True, ephemeral=True)
 
         channel_id = 1286031597845614625

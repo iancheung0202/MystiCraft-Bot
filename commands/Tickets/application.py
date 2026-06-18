@@ -142,7 +142,8 @@ class ApplicationDelete(discord.ui.View):
         emoji="✉️",
     )
     async def delete_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await check_for_manager(interaction)
+        if not await check_for_manager(interaction):
+            return await interaction.response.send_message("❌ You don't have permission to use this button.", ephemeral=True)
         embed = discord.Embed(
             title="Deleting Ticket...",
             description="Ticket will be deleted in 5 seconds",
@@ -162,7 +163,8 @@ class ApplicationDelete(discord.ui.View):
     async def add_applicant(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
-        await check_for_manager(interaction)
+        if not await check_for_manager(interaction):
+            return await interaction.response.send_message("❌ You don't have permission to use this button.", ephemeral=True)
         user = interaction.guild.get_member(
             int(interaction.message.embeds[0].description.split("`")[1])
         )
@@ -202,7 +204,8 @@ class AcceptRejectButton(discord.ui.View):
         label="Accept", style=discord.ButtonStyle.green, custom_id="accept_app"
     )
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await check_for_manager(interaction)
+        if not await check_for_manager(interaction):
+            return await interaction.response.send_message("❌ You don't have permission to use this button.", ephemeral=True)
         if len(interaction.message.embeds) == 0:
             user = interaction.guild.get_member(int(interaction.message.content.split("`")[1]))
         else:
@@ -261,7 +264,8 @@ class AcceptRejectButton(discord.ui.View):
         label="Reject", style=discord.ButtonStyle.red, custom_id="reject_app"
     )
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await check_for_manager(interaction)
+        if not await check_for_manager(interaction):
+            return await interaction.response.send_message("❌ You don't have permission to use this button.", ephemeral=True)
         if len(interaction.message.embeds) == 0:
             user = interaction.guild.get_member(int(interaction.message.content.split("`")[1]))
         else:
@@ -294,7 +298,8 @@ class AcceptRejectButton(discord.ui.View):
         label="Add to Channel", style=discord.ButtonStyle.grey, custom_id="add_applicant_to_channel"
     )
     async def add_applicant(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await check_for_manager(interaction)
+        if not await check_for_manager(interaction):    
+            return await interaction.response.send_message("❌ You don't have permission to use this button.", ephemeral=True)
         user = interaction.guild.get_member(int(interaction.message.embeds[0].description.split("`")[1]))
         application = "staff application" if "staff" in interaction.message.embeds[0].title.lower() else "media application"
         await interaction.channel.set_permissions(user, send_messages=True, read_messages=True, attach_files=True)
