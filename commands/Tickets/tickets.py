@@ -152,7 +152,7 @@ class CreateTicketButton(discord.ui.Button):
             
             # Account linking requirement
             if linked_role_id not in [role.id for role in interaction.user.roles] and interaction.user.id not in COOLDOWN_BYPASS_USER_IDS:
-                return await interaction.response.send_message(
+                return await interaction.followup.send(
                     embed=discord.Embed(
                         title="<:warn:1459986909911842846> **Account Linking Required**",
                         description=f"> To create a **{category_raw}** ticket, you must follow the instructions in <#1460525451368861818> to get linked. Once completed, you will automatically receive the <@&{linked_role_id}> role and be able to create this type of ticket.",
@@ -164,7 +164,7 @@ class CreateTicketButton(discord.ui.Button):
             # Role gated tickets
             if category_name == "high tier testing":
                 if not any(tier in role.name for role in interaction.user.roles if "[" not in role.name and "]" not in role.name for tier in ["HT3", "LT2", "HT2"]):
-                    return await interaction.response.send_message(content="❌ You must have at least a HT3+ gamemode role to create this type of ticket.\nIf you have LT3 and want to test for HT3, head over to <#1467965604257595442> instead.", ephemeral=True)
+                    return await interaction.followup.send(content="❌ You must have at least a HT3+ gamemode role to create this type of ticket.\nIf you have LT3 and want to test for HT3, head over to <#1467965604257595442> instead.", ephemeral=True)
         
         chn = await interaction.guild.create_text_channel(f"⭕️-{interaction.user.name}", category=category_channel)
         await chn.edit(topic=str(interaction.user.id))
@@ -775,7 +775,7 @@ class Ticket(commands.GroupCog, name="ticket"):
         val = flag_type.value
 
         if val == "resolved":
-            await delete_flags(guild, channel.id, FLAG_CHANNEL_IDS)
+            await delete_flags(guild, channel.id)
             await channel.edit(name=f"🟢{channel.name[1:]}")
             return await interaction.response.send_message("✅ Ticket marked as resolved.", ephemeral=True)
 

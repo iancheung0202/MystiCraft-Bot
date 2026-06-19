@@ -14,14 +14,17 @@ async def is_linked(user, client):
     try:
         async with client.tllink_pool.acquire() as conn:
             async with conn.cursor() as cursor:
+                await cursor.execute("SHOW TABLES")
+                result = await cursor.fetchone()
+                link_table = result[0] if result else "mystilinking"
                 await cursor.execute(
-                    "SELECT player_name FROM mystilinking WHERE discord_id = %s",
+                    f"SELECT player_name FROM {link_table} WHERE discord_id = %s",
                     (str(user.id),),
                 )
                 row = await cursor.fetchone()
-                if row and row[0]:
-                    return True, row[0]
-    except Exception:
+                return (True, row[0]) if row else (False, None)
+    except Exception as e:
+        print(f"Error fetching linked IGN for {discord_id}: {e}")
         pass
 
     try:
@@ -41,7 +44,8 @@ async def is_linked(user, client):
         match = re.search(r"\[(.+?)\]$", nickname)
         if match:
             return True, match.group(1).strip()
-    except Exception:
+    except Exception as e:
+        print(e)
         pass
 
     return False, None
@@ -176,16 +180,22 @@ async def send_instructions(interaction, title: str, description: str, view: dis
         embed.set_footer(text="DM the code to one of these bots depending on which gamemode you use /link in")
     await channel.send(embed=embed, view=view)
 
-async def dispatch_node(interaction: discord.Interaction, node_id: str, channel: discord.TextChannel = None):
+async def dispatch_node(interaction: discord.Interaction, node_id: str, channel: discord.TextChannel = None, context: dict = None):
     if channel is None:
         channel = interaction.channel
-        
+
     node = SUPPORT_TREE.get(node_id)
     if node is None:
         print(f"Error: No node found for id {node_id}")
         return
 
     kind = node["type"]
+    description = node.get("description", "")
+    if context:
+        try:
+            description = description.format(**context)
+        except (KeyError, ValueError):
+            pass
 
     CONDITION_MAP = {
         "is_linked": lambda i: is_linked(i.user, i.client)
@@ -202,20 +212,7 @@ async def dispatch_node(interaction: discord.Interaction, node_id: str, channel:
 
         outcome = node.get("if_true") if result else node.get("if_false")
         if isinstance(outcome, str):
-            await dispatch_node(interaction, outcome, channel=channel)
-        elif isinstance(outcome, dict):
-            target_type = outcome.get("node")
-            desc = outcome.get("description", "").format(ign=context_value)
-            
-            if target_type == "final":
-                await send_final(interaction, outcome.get("title"), desc, data=None, color=outcome.get("color", 0x4F9EF5), channel=channel)
-            elif target_type == "instructions":
-                buttons = []
-                for btn in outcome.get("buttons", []):
-                    style = discord.ButtonStyle.green if btn.get("style") == "green" else discord.ButtonStyle.grey
-                    buttons.append(SupportActionButton(label=btn["label"], custom_id=btn["next"], style=style, channel=channel))
-                
-                await send_instructions(interaction, outcome.get("title"), desc, view=SupportChoiceView(buttons), channel=channel)
+            await dispatch_node(interaction, outcome, channel=channel, context={"ign": context_value})
         return
 
     if (kind == "prompt"):
@@ -228,11 +225,19 @@ async def dispatch_node(interaction: discord.Interaction, node_id: str, channel:
                 style = discord.ButtonStyle.red
             buttons.append(SupportActionButton(label=btn["label"], custom_id=btn["next"], style=style, opens_modal=btn.get("opens_modal", False), channel=channel))
         view = SupportChoiceView(buttons)
-        await send_instructions(interaction, title=node["title"], description=node["description"], view=view, channel=channel)
+        await send_instructions(interaction, title=node["title"], description=description, view=view, channel=channel)
     elif (kind == "close"):
-        await send_close_button(interaction, node["title"], node["description"], color=node.get("color", 0xFF0000), channel=channel)
+        await send_close_button(interaction, node["title"], description, color=node.get("color", 0xFF0000), channel=channel)
     elif (kind == "final"):
-        await send_final(interaction, node["title"], node["description"], data=node.get("data"), color=node.get("color", 0x4F9EF5), ping_everyone=node.get("ping_everyone", False), channel=channel)
+        raw_color = node.get("color", 0x4F9EF5)
+        if isinstance(raw_color, str):
+            try:
+                color_int = int(raw_color, 16)
+            except ValueError:
+                color_int = 0x4F9EF5 
+        else:
+            color_int = raw_color
+        await send_final(interaction, node["title"], description, data=node.get("data"), color=color_int, ping_everyone=node.get("ping_everyone", False), channel=channel)
     elif (kind == "modal"):
         cfg = node["modal"]
         async def submit(obj, data, _cfg=cfg, current_channel=channel):
@@ -253,15 +258,30 @@ def register_new_nodes(bot, new_tree: dict):
         node = new_tree.get(node_id)
         if not node:
             return
+            
         opens_modal = node["type"] == "modal"
+        
         async def handler(interaction: discord.Interaction, channel=None, node_id=node_id):
             if not await owner_only(interaction):
                 return
             await dispatch_node(interaction, node_id, channel=channel)
+            
         SUPPORT_HANDLER_REGISTRY[node_id] = (handler, opens_modal)
         newly_registered.append(node_id)
+        
+        # 1. Traverse standard button transitions
         for btn in node.get("buttons", []):
             register(btn["next"])
+            
+        # 2. Traverse conditional transitions (Fixes your issue!)
+        if "if_true" in node:
+            register(node["if_true"])
+        if "if_false" in node:
+            register(node["if_false"])
+            
+        # 3. Traverse transitions following modal structures if applicable
+        if "modal" in node and "next" in node:
+            register(node["next"])
 
     for root_id in new_tree.keys():
         register(root_id)
