@@ -85,7 +85,8 @@ CATEGORY_IDS = {
     },
     SERVER_IDS["tierlist"]: {
         "general support": 1462026697024213024,
-        "high testing": 1462026779823833211,
+        "account/tier transfer": 1517316243324010507,
+        "high tier testing": 1462026779823833211,
         "tier migration": 1462026806335897725,
     },
     f'{SERVER_IDS["support"]} application': {

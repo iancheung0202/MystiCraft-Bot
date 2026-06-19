@@ -123,7 +123,7 @@ class CreateTicketButton(discord.ui.Button):
         cooldown_map = {
             "punishment appeals": "appeal",
             "password reset": "password_reset",
-            "high testing": "high_testing",
+            "high tier testing": "high_testing",
         }
         ticket_category = cooldown_map.get(category_name, "normal")
         cooldown_ref = db.reference(f"/Ticket Cooldown/{interaction.user.id}/{ticket_category}")
@@ -145,50 +145,30 @@ class CreateTicketButton(discord.ui.Button):
                 msg_prefix = cooldown_messages.get(ticket_category, "You are on a cooldown.")
                 return await interaction.response.send_message(content=f"{msg_prefix} Try again <t:{next_time}:R>", ephemeral=True)
 
-        correct_interaction = interaction
-        answer_embed = None
-        ping_role = None  # Pings at the end of support tree
+        await interaction.response.defer(ephemeral=True, thinking=True)
         
         if guild_id == SERVER_IDS["tierlist"]:
             linked_role_id = ROLE_IDS[guild_id]["linked"]
             
             # Account linking requirement
-            if category_name != "general support" and linked_role_id not in [role.id for role in interaction.user.roles] and interaction.user.id not in COOLDOWN_BYPASS_USER_IDS:
+            if linked_role_id not in [role.id for role in interaction.user.roles] and interaction.user.id not in COOLDOWN_BYPASS_USER_IDS:
                 return await interaction.response.send_message(
                     embed=discord.Embed(
-                        title="<:warn:1459986909911842846> **Account Linking Required for Non-Support Tickets**",
+                        title="<:warn:1459986909911842846> **Account Linking Required**",
                         description=f"> To create a **{category_raw}** ticket, you must follow the instructions in <#1460525451368861818> to get linked. Once completed, you will automatically receive the <@&{linked_role_id}> role and be able to create this type of ticket.",
                         color=discord.Colour.red(),
-                    ).set_footer(text="'General Support' tickets do not require account linking."),
+                    ),
                     ephemeral=True,
                 )
             
             # Role gated tickets
-            if category_name == "tester application":
-                if not any(tier in role.name for role in interaction.user.roles if "[" not in role.name and "]" not in role.name for tier in ["LT3", "HT3", "LT2", "HT2"]):
-                    return await interaction.response.send_message(content="❌ You must have at least a LT3+ gamemode role to create this type of ticket.", ephemeral=True)
-            
-            if category_name == "high testing":
+            if category_name == "high tier testing":
                 if not any(tier in role.name for role in interaction.user.roles if "[" not in role.name and "]" not in role.name for tier in ["HT3", "LT2", "HT2"]):
                     return await interaction.response.send_message(content="❌ You must have at least a HT3+ gamemode role to create this type of ticket.\nIf you have LT3 and want to test for HT3, head over to <#1467965604257595442> instead.", ephemeral=True)
-            
-            from commands.Tickets.tree import TicketQuestionsModal
-            modal = TicketQuestionsModal(f"{category_raw} Tierlist")
-            await interaction.response.send_modal(modal)
-            await modal.wait()
-            correct_interaction = modal.on_submit_interaction
-            
-            answer_embed = discord.Embed(color=0x22aef5)
-            for key, value in modal.answers.items():
-                answer_embed.add_field(name=key, value=value, inline=False)
-            answer_embed.set_footer(text="You can add followup information in this channel.")
-            ping_role = interaction.guild.get_role(SUPPORT_ROLE_IDS[guild_id])
-        else:
-            await interaction.response.defer(ephemeral=True, thinking=True)
-
+        
         chn = await interaction.guild.create_text_channel(f"⭕️-{interaction.user.name}", category=category_channel)
         await chn.edit(topic=str(interaction.user.id))
-        await chn.set_permissions(interaction.user, send_messages=True, read_messages=True, attach_files=True)
+        await chn.set_permissions(interaction.user, send_messages=False, read_messages=True, attach_files=True)
 
         open_tickets = 0
         if guild_id in CATEGORY_IDS and isinstance(CATEGORY_IDS[guild_id], dict):
@@ -259,24 +239,13 @@ class CreateTicketButton(discord.ui.Button):
             initial_embed.add_field(name="Region", value=recorded_region, inline=True)
             initial_embed.add_field(name="Current Tiers", value=", ".join([r.mention for r in current_rank_roles]) if current_rank_roles else "None", inline=True)
             
-        elif guild_id == SERVER_IDS["support"]:
-            initial_embed.set_footer(text="You cannot type in tickets before answering all the questions first.")
-            await chn.set_permissions(interaction.user, send_messages=False, read_messages=True, attach_files=True)
-
-        welcome_msg = f"**{interaction.user.mention}, welcome!** {('||' + ping_role.mention + '||') if ping_role else ''}"
+        initial_embed.set_footer(text="You cannot type in tickets before answering all the questions first.")
+        await chn.send(f"**{interaction.user.mention}, welcome!**", embed=initial_embed)
         
-        if answer_embed is None:
-            view = CloseTicketButton() if guild_id != SERVER_IDS["support"] else None
-            await chn.send(welcome_msg, embed=initial_embed, view=view)
-        else:
-            await chn.send(welcome_msg, embed=initial_embed)
-            await chn.send(embed=answer_embed, view=CloseTicketButton())
-            
-        if guild_id == SERVER_IDS["support"]:
-            from commands.Tickets.tree import start_support_tree
-            await start_support_tree(interaction, chn, category_name)
+        from commands.Tickets.tree import start_support_tree
+        await start_support_tree(interaction, chn, category_name)
                 
-        await correct_interaction.followup.send(content=f"Ticket created at <#{chn.id}>.", ephemeral=True)
+        await interaction.followup.send(content=f"Ticket created at <#{chn.id}>.", ephemeral=True)
         cooldown_ref.set(int(interaction.created_at.timestamp()))
 
 

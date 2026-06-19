@@ -85,7 +85,7 @@ class AppealCloseTicketButton(discord.ui.View):
         embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
         from commands.Tickets.tickets import ConfirmCloseTicketButtons
         await interaction.response.send_message(
-            embed=embed, view=ConfirmCloseTicketButtons(), ephemeral=True
+            embed=embed, view=ConfirmCloseTicketButtons(interaction), ephemeral=True
         )
 
     @discord.ui.button(

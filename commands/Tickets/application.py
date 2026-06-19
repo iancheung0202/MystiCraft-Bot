@@ -494,6 +494,9 @@ class ApplicationView(discord.ui.View):
                     "Before we submit your application, are there anything else you would like us to know?",
                 ]
 
+            if not any(tier in role.name for role in interaction.user.roles if "[" not in role.name and "]" not in role.name for tier in ["LT3", "HT3", "LT2", "HT2"]):
+                return await interaction.response.send_message(content="❌ You must have at least a LT3+ gamemode role to apply for a tester position.", ephemeral=True)
+
         ref = db.reference(db_cooldown_path)
         ticketcooldown = ref.get() or {}
         for key, value in ticketcooldown.items():
@@ -515,13 +518,8 @@ class ApplicationView(discord.ui.View):
                 f"3. Maximum character limit per question: `1000` characters"
             ), color=discord.Color.blurple())
             await interaction.user.send(embed=embed)
-            ableToDM = True
         except Exception:
-            await interaction.response.send_message("Please turn on Direct Messages to access the application.", ephemeral=True)
-            ableToDM = False
-
-        if not ableToDM:
-            return
+            return await interaction.response.send_message("Please turn on Direct Messages to access the application. Try again!", ephemeral=True)
 
         await interaction.response.send_message(":envelope_with_arrow: Please proceed to your DMs to finish the application.", ephemeral=True)
         cancelNotice = 'All answers will be kept confidential. Type "cancel" to stop the application.'

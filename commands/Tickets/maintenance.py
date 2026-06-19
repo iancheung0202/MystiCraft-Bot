@@ -415,22 +415,22 @@ class MentionViolation(commands.Cog):
             print(f"[Mention Enforcement] Failed to delete message: {e}")
             return
         if violation_count == 0:
-            embed = discord.Embed(title="⚠️ No Mentioning in Tickets", description="Please do not mention staff members in tickets. Staff will assist you when available.", color=0xFF0000)
-            embed.set_footer(text="This is your first warning. Further violations will result in a timeout and ticket closure.")
+            embed = discord.Embed(description="Please do not mention staff members in tickets. Staff will assist you when available. *You may reply to a staff member's message to remind them if needed.*", color=0xFF0000)
+            embed.set_footer(text="⚠️ This is your first warning. Further violations will result in a timeout and ticket closure.")
             try:
                 await message.channel.send(embed=embed)
             except Exception as e:
                 print(f"[Mention Enforcement] Failed to send first warning: {e}")
             await self.increment_mention_violations(message.channel.id)
         elif violation_count == 1:
-            embed = discord.Embed(title="⚠️ Final Warning", description=f"You have been warned once already. Mentioning staff members is not allowed in tickets. You are now being timed out for 1 hour.", color=0xFFAA00)
-            embed.set_footer(text="This is your final warning before ticket closure.")
+            embed = discord.Embed(description=f"You have been warned once already. Mentioning staff members is not allowed in tickets. You are now being timed out for 30 minutes.", color=0xFFAA00)
+            embed.set_footer(text="⚠️ This is your final warning before ticket closure.")
             try:
                 await message.channel.send(embed=embed)
             except Exception as e:
                 print(f"[Mention Enforcement] Failed to send second warning: {e}")
             try:
-                timeout_duration = datetime.timedelta(hours=1)
+                timeout_duration = datetime.timedelta(minutes=30)
                 await message.author.timeout(timeout_duration, reason="Mentioning in ticket channel after warning")
             except Exception as e:
                 print(f"[Mention Enforcement] Failed to timeout user {message.author.id}: {e}")

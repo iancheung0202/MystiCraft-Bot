@@ -1,0 +1,571 @@
+{
+  "password reset": {
+    "type": "condition",
+    "run_condition": "is_linked",
+    "if_true": {
+      "node": "final",
+      "title": "Password Reset",
+      "description": "Wow! Your account is already linked (`{ign}`). Staff will reset your password within 1-3 days.",
+      "color": 65280
+    },
+    "if_false": "password reset ask login"
+  },
+  "password reset ask login": {
+    "type": "prompt",
+    "title": "Password Reset Verification",
+    "description": "Can you currently log into the Minecraft server with this account?",
+    "buttons": [
+      {"label": "Yes, I can login", "next": "password reset can login"},
+      {"label": "No, I cannot login", "next": "password reset cannot login"}
+    ]
+  },
+  "password reset can login": {
+    "type": "prompt",
+    "title": "Password Reset (Linking Instructions)",
+    "description": "1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n2. Use `/link` in any gamemodes (Lifesteal/Practice/Survival/Vanilla) to get a code\n3. DM the **4-digit code** to the corresponding Discord bot.\n4. Once linked, staff will reset your password within 1-3 days.",
+    "buttons": [
+      {"label": "Yes, I've finished linking", "next": "password reset verify"}
+    ]
+  },
+  "password reset verify": {
+    "type": "condition",
+    "require_owner": true,
+    "run_condition": "is_linked",
+    "if_true": {
+      "node": "final",
+      "title": "Password Reset",
+      "description": "Great! Your account is now linked (`{ign}`). Staff will reset your password within 1-3 days.",
+      "color": 65280
+    },
+    "if_false": {
+      "node": "instructions",
+      "title": "Still Not Linked",
+      "description": "We couldn't detect a link yet. Please try these steps again:\n\n1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n2. Use `/link` in any gamemodes to get a code\n3. DM the **4-digit code** to the corresponding Discord bot.",
+      "buttons": [
+        {"label": "Verify Again", "next": "password reset verify", "style": "green"}
+      ]
+    }
+  },
+  "password reset cannot login": {
+    "type": "close",
+    "title": "Password Reset",
+    "description": "Unfortunately, verification is impossible without a prior link to your account. Please continue to play on MystiCraft with an alt account."
+  },
+  "other questions": {
+    "type": "prompt",
+    "title": "Server Questions",
+    "description": "Choose a topic that you need help with. If you have a question not listed here, select **Other Questions**.",
+    "buttons": [
+      {"label": "How to Link Account", "next": "how to link"},
+      {"label": "Switching from Cracked to Premium", "next": "switch from cracked to premium"},
+      {"label": "Other Questions", "next": "other issues"}
+    ]
+  },
+  "how to link": {
+    "type": "close",
+    "title": "How to Your Account",
+    "description": "1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n2. Use `/link` in any gamemodes (Lifesteal/Practice/Survival/Vanilla) to get a code\n3. DM the **4-digit code** to the corresponding Discord bot.\n4. Kaboom! You are now successfully linked!",
+    "color": 5218037
+  },
+  "switch from cracked to premium": {
+    "type": "close",
+    "title": "Switching from Cracked to Premium",
+    "description": "Log in with your cracked account, run `/premium <yourpassword>`, log out, then log back in with your premium account.\n\nYour premium account must have the **exact same username** as your cracked account, and the cracked account will no longer be used after migration.",
+    "color": 5218037
+  },
+  "other issues": {
+    "type": "prompt",
+    "title": "Other Questions or Issues",
+    "description": "Are you reporting a player/staff member, reporting a bug, or appealing for a punishment?",
+    "buttons": [
+      {"label": "Yes", "next": "other issues yes"},
+      {"label": "No", "next": "other issues no", "opens_modal": true}
+    ]
+  },
+  "other issues yes": {
+    "type": "close",
+    "title": "Wrong Category",
+    "description": "You created the wrong type of ticket. Please close this ticket and create a new ticket with the correct category in <#1373881299651268710>."
+  },
+  "other issues no": {
+    "type": "modal",
+    "modal": {
+      "title": "Server Question",
+      "fields": [
+        ["IGN", "What is your in-game name?", true],
+        ["Question", "What would you like to ask?", true]
+      ],
+      "result_title": "Server Questions",
+      "result_description": "Thanks! Staff will review your question shortly."
+    }
+  },
+  "billing support": {
+    "type": "prompt",
+    "title": "Billing Support",
+    "description": "Choose the billing issue that best matches your request.",
+    "buttons": [
+      {"label": "I haven't received my purchase", "next": "billing purchase", "opens_modal": true},
+      {"label": "I want to request a refund", "next": "billing refund", "opens_modal": true},
+      {"label": "I want to transfer a rank", "next": "billing transfer"}
+    ]
+  },
+  "billing purchase": {
+    "type": "modal",
+    "modal": {
+      "title": "Billing Support",
+      "fields": [
+        ["IGN", "What is your in-game name?", true],
+        ["Transaction ID/Email", "Transaction ID or email used", true],
+        ["Description/Reason", "Describe the issue", true]
+      ],
+      "result_title": "Billing Support",
+      "result_description": "Thanks! Staff will review your billing request shortly."
+    }
+  },
+  "billing refund": {
+    "type": "modal",
+    "modal": {
+      "title": "Billing Support",
+      "fields": [
+        ["IGN", "What is your in-game name?", true],
+        ["Transaction ID/Email", "Transaction ID or email used", true],
+        ["Description/Reason", "Describe reason for refund", true]
+      ],
+      "result_title": "Billing Support",
+      "result_description": "Thanks! Staff will review your billing request shortly."
+    }
+  },
+  "billing transfer": {
+    "type": "close",
+    "title": "Rank Transfer",
+    "description": "Purchases, ranks, and perks are **non-transferable**."
+  },
+  "punishment appeals": {
+    "type": "prompt",
+    "title": "Punishment Appeal",
+    "description": "Choose the appeal type that matches your case. Be sincere and talk about how you were unfairly punished or deserve a second chance.",
+    "buttons": [
+      {"label": "My in-game punishment", "next": "punishment appeal mc", "opens_modal": true},
+      {"label": "My Discord punishment", "next": "punishment appeal dc", "opens_modal": true},
+      {"label": "My friend's punishment", "next": "punishment appeal friend"}
+    ]
+  },
+  "punishment appeal mc": {
+    "type": "modal",
+    "modal": {
+      "title": "Minecraft Appeal",
+      "fields": [
+        ["IGN", "What is your in-game name?", true],
+        ["Punishment Reason/ID", "Reason or ID of the punishment", true],
+        ["Appeal Statement", "Why should the punishment be removed?", true]
+      ],
+      "result_title": "Minecraft Punishment Appeal",
+      "result_description": "Your appeal has been submitted. Staff will review it shortly. We do not guarantee that we will accept your appeal. Our decision is final (meaning you cannot appeal your appeal decision), and you can appeal again in 14 days if it is rejected.",
+      "use_appeal_close_button": true
+    }
+  },
+  "punishment appeal dc": {
+    "type": "modal",
+    "modal": {
+      "title": "Discord Appeal",
+      "fields": [
+        ["Discord Username", "Your Discord username", true],
+        ["Reason", "Reason for the punishment", true],
+        ["Appeal Statement", "Why should the punishment be removed?", true]
+      ],
+      "result_title": "Discord Punishment Appeal",
+      "result_description": "Your appeal has been submitted. Staff will review it shortly. We do not guarantee that we will accept your appeal. Our decision is final (meaning you cannot appeal your appeal decision), and you can appeal again in 14 days if it is rejected."
+    }
+  },
+  "punishment appeal friend": {
+    "type": "close",
+    "title": "Appeal Rejected",
+    "description": "We do not process appeals initiated for other people."
+  },
+  "player reports": {
+    "type": "prompt",
+    "title": "Player Report",
+    "description": "Choose the type of behaviour you want to report.",
+    "buttons": [
+      {"label": "Cheating / Hacking", "next": "player report cheat"},
+      {"label": "Chat Misbehavior", "next": "player report chat"}
+    ]
+  },
+  "player report cheat": {
+    "type": "prompt",
+    "title": "Player Report (Cheating)",
+    "description": "Do you have clear video evidence?",
+    "buttons": [
+      {"label": "Yes", "next": "player report cheat video", "opens_modal": true},
+      {"label": "No", "next": "player report cheat no video"}
+    ]
+  },
+  "player report cheat video": {
+    "type": "modal",
+    "modal": {
+      "title": "Player Report",
+      "fields": [
+        ["Offender IGN", "Offending player's in-game name", true],
+        ["Description", "Describe what happened", true],
+        ["Link to Video Proof", "Paste the video link", true]
+      ],
+      "result_title": "Player Report",
+      "result_description": "Thanks! Staff will review the report shortly. Whether or not we take action is up to the discretion of our staff."
+    }
+  },
+  "player report cheat no video": {
+    "type": "close",
+    "title": "Player Report",
+    "description": "Unfortunately, without video proof we cannot take action against any players. Please try to screen record future encounters."
+  },
+  "player report chat": {
+    "type": "close",
+    "title": "Player Report (Chat Misbehavior)",
+    "description": "Unfortunately, our time window for chat punishments is 5 minutes, meaning moderators are only allowed to take action on chat misbehaviour that occurred in the last 5 minutes. By the time you created a ticket and a moderator comes online, that window has likely passed. Therefore, **we won't process chat reports in tickets.** Next time, you are encouraged to use the `/report` command in-game to send moderators a notification so we can take action immediately."
+  },
+  "bug/glitch reports": {
+    "type": "prompt",
+    "title": "Bug / Glitch Report",
+    "description": "Do you have clear video evidence?",
+    "buttons": [
+      {"label": "Yes", "next": "bug video"},
+      {"label": "No", "next": "bug no video"}
+    ]
+  },
+  "bug video": {
+    "type": "prompt",
+    "title": "Bug / Glitch Report",
+    "description": "Choose the kind of bug report you are submitting.",
+    "buttons": [
+      {"label": "Reporting a bug (no items lost)", "next": "bug no items lost", "opens_modal": true},
+      {"label": "Lost items due to a bug", "next": "bug lost items", "opens_modal": true},
+      {"label": "Lost items due to lag / combat log", "next": "bug lag"}
+    ]
+  },
+  "bug no video": {
+    "type": "close",
+    "title": "Bug / Glitch Report",
+    "description": "Without video proof or reproduction steps, we cannot fix bugs or restore items."
+  },
+  "bug no items lost": {
+    "type": "modal",
+    "modal": {
+      "title": "Bug Report",
+      "fields": [
+        ["IGN", "What is your in-game name?", true],
+        ["Bug Description", "Describe the bug and how to reproduce it", true],
+        ["Link to Video Proof of Bug", "Paste the video link", true]
+      ],
+      "result_title": "Bug / Glitch Report",
+      "result_description": "Thanks! Our owner will review the bug report shortly."
+    }
+  },
+  "bug lost items": {
+    "type": "modal",
+    "modal": {
+      "title": "Bug / Item Loss",
+      "fields": [
+        ["IGN", "What is your in-game name?", true],
+        ["Bug Description", "Describe the bug and how to reproduce it", true],
+        ["Link to Video Proof of Bug", "Paste the video link", true]
+      ],
+      "result_title": "Bug / Glitch Report (Item Loss)",
+      "result_description": "Thanks! Our owner will review the bug report shortly."
+    }
+  },
+  "bug lag": {
+    "type": "close",
+    "title": "Bug / Glitch Report",
+    "description": "Sorry, we do not restore items lost to lag, despawns, or combat disconnects."
+  },
+  "staff reports": {
+    "type": "prompt",
+    "title": "Staff Report",
+    "description": "Do you have proof of the staff member's behaviour (screenshots/videos)?",
+    "buttons": [
+      {"label": "Yes", "next": "staff proof yes", "opens_modal": true},
+      {"label": "No", "next": "staff proof no"}
+    ]
+  },
+  "staff proof yes": {
+    "type": "modal",
+    "modal": {
+      "title": "Staff Report",
+      "fields": [
+        ["Your IGN", "What is your in-game name?", true],
+        ["Staff IGN", "Who are you reporting?", true],
+        ["Incident Description", "Describe what happened", true],
+        ["Proof Link", "Paste the proof link", true]
+      ],
+      "result_title": "Staff Report",
+      "result_description": "Thanks! Our managers and owners will review the report shortly.",
+      "ping_everyone": true
+    }
+  },
+  "staff proof no": {
+    "type": "close",
+    "title": "Staff Report",
+    "description": "Unfortunately, we cannot investigate any staff report without concrete evidence and proof."
+  },
+  "high tier testing": {
+    "type": "prompt",
+    "title": "High Tier Testing",
+    "description": "Please select the gamemode you want to test for LT2:",
+    "buttons": [
+      {"label": "NPOT", "next": "high tier testing ok npot"},
+      {"label": "DPOT", "next": "high tier testing ok dpot"},
+      {"label": "SMP", "next": "high tier testing ok smp"},
+      {"label": "Sword", "next": "high tier testing ok sword"},
+      {"label": "Crystal", "next": "high tier testing ok crystal"},
+      {"label": "Axe", "next": "high tier testing ok axe"},
+      {"label": "Mace", "next": "high tier testing ok mace"},
+      {"label": "UHC", "next": "high tier testing ok uhc"}
+    ]
+  },
+  "high tier testing ok npot": {
+    "type": "final",
+    "title": "NPOT High Tier Testing Request",
+    "description": "Thank you! Note that we may not be able to accommodate all requests due to limited testers, regulators, and time constraints.",
+    "color": 3128826
+  },
+  "high tier testing ok dpot": {
+    "type": "final",
+    "title": "DPOT High Tier Testing Request",
+    "description": "Thank you! Note that we may not be able to accommodate all requests due to limited testers, regulators, and time constraints.",
+    "color": 3128826
+  },
+  "high tier testing ok smp": {
+    "type": "final",
+    "title": "SMP High Tier Testing Request",
+    "description": "Thank you! Note that we may not be able to accommodate all requests due to limited testers, regulators, and time constraints.",
+    "color": 3128826
+  },
+  "high tier testing ok sword": {
+    "type": "final",
+    "title": "Sword High Tier Testing Request",
+    "description": "Thank you! Note that we may not be able to accommodate all requests due to limited testers, regulators, and time constraints.",
+    "color": 3128826
+  },
+  "high tier testing ok crystal": {
+    "type": "final",
+    "title": "Crystal High Tier Testing Request",
+    "description": "Thank you! Note that we may not be able to accommodate all requests due to limited testers, regulators, and time constraints.",
+    "color": 3128826
+  },
+  "high tier testing ok axe": {
+    "type": "final",
+    "title": "Axe High Tier Testing Request",
+    "description": "Thank you! Note that we may not be able to accommodate all requests due to limited testers, regulators, and time constraints.",
+    "color": 3128826
+  },
+  "high tier testing ok mace": {
+    "type": "final",
+    "title": "Mace High Tier Testing Request",
+    "description": "Thank you! Note that we may not be able to accommodate all requests due to limited testers, regulators, and time constraints.",
+    "color": 3128826
+  },
+  "high tier testing ok uhc": {
+    "type": "final",
+    "title": "UHC High Tier Testing Request",
+    "description": "Thank you! Note that we may not be able to accommodate all requests due to limited testers, regulators, and time constraints.",
+    "color": 3128826
+  },
+  "tier migration": {
+    "type": "prompt",
+    "title": "Tier Migration",
+    "description": "Please select the Minecraft server you want to migrate your tiers from:",
+    "buttons": [
+      {"label": "MC Tiers", "next": "migration server ok mctiers", "opens_modal": true},
+      {"label": "PvP Tiers", "next": "migration server ok pvptiers", "opens_modal": true},
+      {"label": "Other Tierlists", "next": "migration no", "opens_modal": true}
+    ]
+  },
+  "migration server ok mctiers": {
+    "type": "final",
+    "title": "Tier Migration Request",
+    "description": "**Please forward your results message from the MC Tiers Discord server to this ticket as proof!** Without proof, we cannot process your migration request."
+  },
+  "migration server ok pvptiers": {
+    "type": "final",
+    "title": "Tier Migration Request",
+    "description": "**Please forward your results message from the PvP Tiers Discord server to this ticket as proof!** Without proof, we cannot process your migration request."
+  },
+  "migration no": {
+    "type": "close",
+    "title": "Tierlist Not Supported",
+    "description": "Unfortunately, we do not support migrations from other tierlists at this time."
+  },
+  "account/tier transfer": {
+    "type": "prompt",
+    "title": "Account, Tiers, or Roles Transfers",
+    "description": "Please select the specific issue you are experiencing with your linked accounts, tiers, or roles:",
+    "buttons": [
+      {"label": "My tiers on the website are missing", "next": "missing website tiers", "opens_modal": true},
+      {"label": "My tier roles on Discord are missing", "next": "missing discord roles", "opens_modal": true},
+      {"label": "I need to transfer my old tiers", "next": "transfer tier"},
+      {"label": "I have another issue", "next": "general support others", "opens_modal": true}
+    ]
+  },
+  "missing website tiers": {
+    "type": "modal",
+    "modal": {
+      "title": "Missing Website Tiers",
+      "fields": [
+        ["IGN", "What is your Minecraft in-game name?", true],
+        ["Missing Tiers", "Which tiers are currently missing from the website?", true]
+      ],
+      "result_title": "Website Tier Correction Request",
+      "result_description": "Thank you! Our team will review your request and update your tiers accordingly if applicable."
+    }
+  },
+  "missing discord roles": {
+    "type": "modal",
+    "modal": {
+      "title": "Missing Discord Tier Roles",
+      "fields": [
+        ["IGN", "What is your Minecraft in-game name?", true],
+        ["Missing Roles", "Which tier roles are missing on your Discord profile?", true]
+      ],
+      "result_title": "Discord Role Sync Request",
+      "result_description": "Thank you! Our team will review your request and update your Discord roles accordingly if applicable."
+    }
+  },
+  "transfer tier": {
+    "type": "prompt",
+    "title": "Tier Transfer Options",
+    "description": "Please select the type of transfer migration you need for your existing tiers:",
+    "buttons": [
+      {"label": "I need to transfer my tiers to a new Minecraft account", "next": "transfer mc account", "opens_modal": true},
+      {"label": "I need to change my Minecraft username", "next": "transfer mc username", "opens_modal": true},
+      {"label": "I need to transfer my tiers to a new Discord account", "next": "transfer discord account", "opens_modal": true},
+      {"label": "I have another issue", "next": "general support others", "opens_modal": true}
+    ]
+  },
+  "transfer mc account": {
+    "type": "modal",
+    "modal": {
+      "title": "Minecraft Account Tier Transfer",
+      "fields": [
+        ["Old IGN", "What is your old Minecraft username?", true],
+        ["New IGN", "What is your new Minecraft username?", true]
+      ],
+      "result_title": "Account Migration Transfer Request",
+      "result_description": "Thank you! Our team will review your request and transfer your tiers to the new account if applicable.\n\n**You can speed up the process by linking your new Minecraft account to Discord (<#1460525451368861818>) if you haven't already.**"
+    }
+  },
+  "transfer mc username": {
+    "type": "modal",
+    "modal": {
+      "title": "Minecraft Username Change Sync",
+      "fields": [
+        ["Old IGN", "What was your previous username?", true],
+        ["New IGN", "What is your new username?", true]
+      ],
+      "result_title": "Account Username Change Request",
+      "result_description": "Thank you! Our team will review your request and update your tier listings to match your new username if applicable.\n\n**You can speed up the process by linking your renamed Minecraft account again to Discord (<#1460525451368861818>) if you haven't already.**"
+    }
+  },
+  "transfer discord account": {
+    "type": "modal",
+    "modal": {
+      "title": "Discord Account Transfer",
+      "fields": [
+        ["Old Discord Account", "What is your old Discord username or ID?", true],
+        ["New Discord Account", "What is your new Discord username or ID?", true],
+        ["IGN", "What is your Minecraft username?", true]
+      ],
+      "result_title": "Discord Account Migration Request",
+      "result_description": "Thank you! Our team will review your request and transfer your Discord roles to the new account if applicable.\n\n**You can speed up the process by linking your existing Minecraft account to the new Discord account (<#1460525451368861818>) if you haven't already.**"
+    }
+  },
+  "general support": {
+    "type": "prompt",
+    "title": "General Support",
+    "description": "Select the option that best matches your support inquiry:",
+    "buttons": [
+      {"label": "When can I get tested?", "next": "when test"},
+      {"label": "I have an issue with my HT3 testing", "next": "ht3 issue"},
+      {"label": "My tester gave me an unfair rank", "next": "unfair rank", "opens_modal": true},
+      {"label": "I want to appeal my punishment", "next": "support server appeal"},
+      {"label": "I want to report a bug/glitch", "next": "support server bug"},
+      {"label": "I want to reset my password", "next": "support server password"},
+      {"label": "I have another issue", "next": "general support others", "opens_modal": true}
+    ]
+  },
+  "when test": {
+    "type": "close",
+    "title": "Waitlist Instructions",
+    "description": "After you've joined a waitlist at <#1304842299376799857>, you are not immediately going to be tested. The queue will be open whenever a tester for your region becomes available, and **we don't know when that will be**. Please be patient!\n\nWhen a tester for this region becomes available, you will be pinged with a button to join a queue to be tested. If no testers are available, the queue remains closed and you will not see the button until a tester has opened the queue.",
+    "color": 16711680
+  },
+  "ht3 issue": {
+    "type": "prompt",
+    "title": "High Tier 3 (HT3) Support",
+    "description": "Select the option that matches your concern:",
+    "buttons": [
+      {"label": "I cannot join the HT3 waitlist", "next": "ht3 cannot join", "opens_modal": true},
+      {"label": "My assigned tester is not responding", "next": "ht3 unresponsive", "opens_modal": true},
+      {"label": "I have another issue", "next": "general support others", "opens_modal": true}
+    ]
+  },
+  "ht3 cannot join": {
+    "type": "modal",
+    "modal": {
+      "title": "HT3 Waitlist Issue",
+      "fields": [
+        ["Gamemode", "Which gamemode are you facing issues with?", true],
+        ["Issue Details", "Describe the exact issue you are encountering", true]
+      ],
+      "result_title": "HT3 Waitlist Issue Report",
+      "result_description": "Thank you! Staff will assist you shortly."
+    }
+  },
+  "ht3 unresponsive": {
+    "type": "modal",
+    "modal": {
+      "title": "Tester Not Responding",
+      "fields": [
+        ["Gamemode", "Which gamemode is this for?", true],
+        ["Ticket Link", "Provide your original testing ticket link", true]
+      ],
+      "result_title": "Unresponsive HT3 Tester",
+      "result_description": "Thank you! Staff will look into this and get back to you shortly."
+    }
+  },
+  "unfair rank": {
+    "type": "close",
+    "title": "Test Decisions Policy",
+    "description": "All rank placements and evaluations are entirely up to the tester's professional discretion. Tester decisions are final and are not open to disputes on the tier given.",
+    "color": 16711680
+  },
+  "support server appeal": {
+    "type": "close",
+    "title": "Wrong Server",
+    "description": "This is not the correct server for punishment appeals. No staff member can assist you here. For punishment appeals, bug reports, or password issues, please head over to our support server (https://discord.gg/W735Rtgy4D) and create a ticket there with the correct category.",
+    "color": 16711680
+  },
+  "support server bug": {
+    "type": "close",
+    "title": "Wrong Server",
+    "description": "This is not the correct server for bug reports. No staff member can assist you here. For punishment appeals, bug reports, or password issues, please head over to our support server (https://discord.gg/W735Rtgy4D) and create a ticket there with the correct category.",
+    "color": 16711680
+  },
+  "support server password": {
+    "type": "close",
+    "title": "Wrong Server",
+    "description": "This is not the correct server for password resets. No staff member can assist you here. For punishment appeals, bug reports, or password issues, please head over to our support server (https://discord.gg/W735Rtgy4D) and create a ticket there with the correct category.",
+    "color": 16711680
+  },
+  "general support others": {
+    "type": "modal",
+    "modal": {
+      "title": "Support Inquiry",
+      "fields": [
+        ["IGN", "What is your in-game name? (If applicable)", false],
+        ["Inquiry/Issue", "Please explain your issue or question in detail", true]
+      ],
+      "result_title": "General Support",
+      "result_description": "Thanks! Staff will assist you shortly."
+    }
+  }
+}

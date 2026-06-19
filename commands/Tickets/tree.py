@@ -1,7 +1,13 @@
 import discord
 import re
+import os
+import asyncio
+import aiohttp
 
 from constants import SUPPORT_ROLE_IDS, SERVER_IDS, ROLE_IDS
+
+SUPPORT_TREE: dict[str, dict] = {}  
+SUPPORT_HANDLER_REGISTRY: dict[str, tuple] = {}
 
 async def is_linked(user, client):
     """Return (linked, ign) for a member using the linking table or main-server nickname fallback."""
@@ -91,6 +97,7 @@ class SupportFormModal(discord.ui.Modal):
                 placeholder=placeholder,
                 required=required,
                 max_length=2000,
+                custom_id=label
             )
             self.add_item(item)
 
@@ -169,393 +176,6 @@ async def send_instructions(interaction, title: str, description: str, view: dis
         embed.set_footer(text="DM the code to one of these bots depending on which gamemode you use /link in")
     await channel.send(embed=embed, view=view)
 
-SUPPORT_TREE: dict[str, dict] = {
-
-    "password reset": {
-        "type": "condition",
-        "run_condition": "is_linked",
-        "if_true": {
-            "node": "final",
-            "title": "Password Reset",
-            "description": "Wow! Your account is already linked (`{ign}`). Staff will reset your password within 1-3 days.",
-            "color": 0x00FF00
-        },
-        "if_false": "password reset ask login"
-    },
-    "password reset ask login": {
-        "type": "prompt",
-        "title": "Password Reset Verification",
-        "description": "Can you currently log into the Minecraft server with this account?",
-        "buttons": [
-            {"label": "Yes, I can login", "next": "password reset can login"},
-            {"label": "No, I cannot login", "next": "password reset cannot login"},
-        ],
-    },
-    "password reset can login": {
-        "type": "prompt",
-        "title": "Password Reset (Linking Instructions)",
-        "description": (
-            "1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n"
-            "2. Use `/link` in any gamemodes (Lifesteal/Practice/Survival/Vanilla) to get a code\n"
-            "3. DM the **4-digit code** to the corresponding Discord bot.\n"
-            "4. Once linked, staff will reset your password within 1-3 days."
-        ),
-        "buttons": [
-            {"label": "Yes, I've finished linking", "next": "password reset verify"},
-        ],
-    },
-    "password reset verify": {
-        "type": "condition",
-        "require_owner": True,
-        "run_condition": "is_linked",
-        "if_true": {
-            "node": "final",
-            "title": "Password Reset",
-            "description": "Great! Your account is now linked (`{ign}`). Staff will reset your password within 1-3 days.",
-            "color": 0x00FF00
-        },
-        "if_false": {
-            "node": "instructions",
-            "title": "Still Not Linked",
-            "description": (
-                "We couldn't detect a link yet. Please try these steps again:\n\n"
-                "1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n"
-                "2. Use `/link` in any gamemodes to get a code\n"
-                "3. DM the **4-digit code** to the corresponding Discord bot."
-            ),
-            "buttons": [
-                {"label": "Verify Again", "next": "password reset verify", "style": "green"}
-            ]
-        }
-    },
-    "password reset cannot login": {
-        "type": "close",
-        "title": "Password Reset",
-        "description": (
-            "Unfortunately, verification is impossible without a prior link to your account. "
-            "Please continue to play on MystiCraft with an alt account."
-        ),
-    },
-
-    "other questions": {
-        "type": "prompt",
-        "title": "Server Questions",
-        "description": "Choose a topic that you need help with. If you have a question not listed here, select **Other Questions**.",
-        "buttons": [
-            {"label": "How to Link Account",               "next": "how to link"},
-            {"label": "Switching from Cracked to Premium", "next": "switch from cracked to premium"},
-            {"label": "Other Questions",                   "next": "other issues"},
-        ],
-    },
-    "how to link": {
-        "type": "close",
-        "title": "How to Link Your Account",
-        "description": (
-            "1. Join the [main Discord server](https://discord.gg/mysticraft) if you haven't already\n"
-            "2. Use `/link` in any gamemodes (Lifesteal/Practice/Survival/Vanilla) to get a code\n"
-            "3. DM the **4-digit code** to the corresponding Discord bot.\n"
-            "4. Kaboom! You are now successfully linked!"
-        ),
-        "color": 0x4F9EF5,
-    },
-    "switch from cracked to premium": {
-        "type": "close",
-        "title": "Switching from Cracked to Premium",
-        "description": (
-            "Log in with your cracked account, run `/premium <yourpassword>`, log out, "
-            "then log back in with your premium account.\n\n"
-            "Your premium account must have the **exact same username** as your cracked "
-            "account, and the cracked account will no longer be used after migration."
-        ),
-        "color": 0x4F9EF5,
-    },
-    "other issues": {
-        "type": "prompt",
-        "title": "Other Questions or Issues",
-        "description": "Are you reporting a player/staff member, reporting a bug, or appealing for a punishment?",
-        "buttons": [
-            {"label": "Yes", "next": "other issues yes", },
-            {"label": "No",  "next": "other issues no", "opens_modal": True},
-        ],
-    },
-    "other issues yes": {
-        "type": "close",
-        "title": "Wrong Category",
-        "description": (
-            "You created the wrong type of ticket. Please close this ticket and create a new ticket "
-            "with the correct category in <#1373881299651268710>."
-        ),
-    },
-    "other issues no": {
-        "type": "modal",
-        "modal": {
-            "title": "Server Question",
-            "fields": [
-                ("IGN",      "What is your in-game name?",  True),
-                ("Question", "What would you like to ask?", True),
-            ],
-            "result_title":       "Server Questions",
-            "result_description": "Thanks! Staff will review your question shortly.",
-        },
-    },
-
-    "billing support": {
-        "type": "prompt",
-        "title": "Billing Support",
-        "description": "Choose the billing issue that best matches your request.",
-        "buttons": [
-            {"label": "I haven't received my purchase", "next": "billing purchase",  "opens_modal": True},
-            {"label": "I want to request a refund",     "next": "billing refund",    "opens_modal": True},
-            {"label": "I want to transfer a rank",      "next": "billing transfer"},
-        ],
-    },
-    "billing purchase": {
-        "type": "modal",
-        "modal": {
-            "title": "Billing Support",
-            "fields": [
-                ("IGN",                   "What is your in-game name?",             True),
-                ("Transaction ID/Email",  "Transaction ID or email used",           True),
-                ("Description/Reason",    "Describe the issue", True),
-            ],
-            "result_title":       "Billing Support",
-            "result_description": "Thanks! Staff will review your billing request shortly.",
-        },
-    },
-    "billing refund": {
-        "type": "modal",
-        "modal": {
-            "title": "Billing Support",
-            "fields": [
-                ("IGN",                   "What is your in-game name?",             True),
-                ("Transaction ID/Email",  "Transaction ID or email used",           True),
-                ("Description/Reason",    "Describe reason for refund", True),
-            ],
-            "result_title":       "Billing Support",
-            "result_description": "Thanks! Staff will review your billing request shortly.",
-        },
-    },
-    "billing transfer": {
-        "type": "close",
-        "title": "Rank Transfer",
-        "description": "Purchases, ranks, and perks are **non-transferable**.",
-    },
-
-    "punishment appeals": {
-        "type": "prompt",
-        "title": "Punishment Appeal",
-        "description": (
-            "Choose the appeal type that matches your case. Be sincere and talk about how you were "
-            "unfairly punished or deserve a second chance."
-        ),
-        "buttons": [
-            {"label": "My in-game punishment",  "next": "punishment appeal mc",     "opens_modal": True},
-            {"label": "My Discord punishment",  "next": "punishment appeal dc",     "opens_modal": True},
-            {"label": "My friend's punishment", "next": "punishment appeal friend"},
-        ],
-    },
-    "punishment appeal mc": {
-        "type": "modal",
-        "modal": {
-            "title": "Minecraft Appeal",
-            "fields": [
-                ("IGN",                  "What is your in-game name?",            True),
-                ("Punishment Reason/ID", "Reason or ID of the punishment",        True),
-                ("Appeal Statement",     "Why should the punishment be removed?", True),
-            ],
-            "result_title":       "Minecraft Punishment Appeal",
-            "result_description": (
-                "Your appeal has been submitted. Staff will review it shortly. "
-                "We do not guarantee that we will accept your appeal. Our decision is final "
-                "(meaning you cannot appeal your appeal decision), and you can appeal again "
-                "in 14 days if it is rejected."
-            ),
-            "use_appeal_close_button": True,
-        },
-    },
-    "punishment appeal dc": {
-        "type": "modal",
-        "modal": {
-            "title": "Discord Appeal",
-            "fields": [
-                ("Discord Username",  "Your Discord username",                    True),
-                ("Reason",           "Reason for the punishment",                 True),
-                ("Appeal Statement", "Why should the punishment be removed?",     True),
-            ],
-            "result_title":       "Discord Punishment Appeal",
-            "result_description": (
-                "Your appeal has been submitted. Staff will review it shortly. "
-                "We do not guarantee that we will accept your appeal. Our decision is final "
-                "(meaning you cannot appeal your appeal decision), and you can appeal again "
-                "in 14 days if it is rejected."
-            ),
-        },
-    },
-    "punishment appeal friend": {
-        "type": "close",
-        "title": "Appeal Rejected",
-        "description": "We do not process appeals initiated for other people.",
-    },
-
-    "player reports": {
-        "type": "prompt",
-        "title": "Player Report",
-        "description": "Choose the type of behaviour you want to report.",
-        "buttons": [
-            {"label": "Cheating / Hacking", "next": "player report cheat"},
-            {"label": "Chat Misbehavior",   "next": "player report chat"},
-        ],
-    },
-    "player report cheat": {
-        "type": "prompt",
-        "title": "Player Report (Cheating)",
-        "description": "Do you have clear video evidence?",
-        "buttons": [
-            {"label": "Yes", "next": "player report cheat video", "opens_modal": True},
-            {"label": "No",  "next": "player report cheat no video"},
-        ],
-    },
-    "player report cheat video": {
-        "type": "modal",
-        "modal": {
-            "title": "Player Report",
-            "fields": [
-                ("Offender IGN",       "Offending player's in-game name", True),
-                ("Description",        "Describe what happened",           True),
-                ("Link to Video Proof", "Paste the video link",            True),
-            ],
-            "result_title":       "Player Report",
-            "result_description": (
-                "Thanks! Staff will review the report shortly. "
-                "Whether or not we take action is up to the discretion of our staff."
-            ),
-        },
-    },
-    "player report cheat no video": {
-        "type": "close",
-        "title": "Player Report",
-        "description": (
-            "Unfortunately, without video proof we cannot take action against any players. "
-            "Please try to screen record future encounters."
-        ),
-    },
-    "player report chat": {
-        "type": "close",
-        "title": "Player Report (Chat Misbehavior)",
-        "description": (
-            "Unfortunately, our time window for chat punishments is 5 minutes, meaning "
-            "moderators are only allowed to take action on chat misbehaviour that occurred "
-            "in the last 5 minutes. By the time you created a ticket and a moderator comes "
-            "online, that window has likely passed. Therefore, **we won't process chat reports "
-            "in tickets.** Next time, you are encouraged to use the `/report` command "
-            "in-game to send moderators a notification so we can take action immediately."
-        ),
-    },
-
-    "bug/glitch reports": {
-        "type": "prompt",
-        "title": "Bug / Glitch Report",
-        "description": "Do you have clear video evidence?",
-        "buttons": [
-            {"label": "Yes", "next": "bug video"},
-            {"label": "No",  "next": "bug no video"},
-        ],
-    },
-    "bug video": {
-        "type": "prompt",
-        "title": "Bug / Glitch Report",
-        "description": "Choose the kind of bug report you are submitting.",
-        "buttons": [
-            {"label": "Reporting a bug (no items lost)",    "next": "bug no items lost",   "opens_modal": True},
-            {"label": "Lost items due to a bug",            "next": "bug lost items", "opens_modal": True},
-            {"label": "Lost items due to lag / combat log", "next": "bug lag"},
-        ],
-    },
-    "bug no video": {
-        "type": "close",
-        "title": "Bug / Glitch Report",
-        "description": "Without video proof or reproduction steps, we cannot fix bugs or restore items.",
-    },
-    "bug no items lost": {
-        "type": "modal",
-        "modal": {
-            "title": "Bug Report",
-            "fields": [
-                ("IGN", "What is your in-game name?", True),
-                ("Bug Description", "Describe the bug and how to reproduce it", True),
-                ("Link to Video Proof of Bug", "Paste the video link", True),
-            ],
-            "result_title":       "Bug / Glitch Report",
-            "result_description": "Thanks! Our owner will review the bug report shortly.",
-        },
-    },
-    "bug lost items": {
-        "type": "modal",
-        "modal": {
-            "title": "Bug / Item Loss",
-            "fields": [
-                ("IGN", "What is your in-game name?", True),
-                ("Bug Description", "Describe the bug and how to reproduce it", True),
-                ("Link to Video Proof of Bug", "Paste the video link", True),
-            ],
-            "result_title":       "Bug / Glitch Report (Item Loss)",
-            "result_description": "Thanks! Our owner will review the bug report shortly.",
-        },
-    },
-    "bug lag": {
-        "type": "close",
-        "title": "Bug / Glitch Report",
-        "description": "Sorry, we do not restore items lost to lag, despawns, or combat disconnects.",
-    },
-
-    "staff reports": {
-        "type": "prompt",
-        "title": "Staff Report",
-        "description": "Did the staff member unfairly **punish** you?",
-        "buttons": [
-            {"label": "Yes", "next": "staff punish"},
-            {"label": "No",  "next": "staff punish no"},
-        ],
-    },
-    "staff punish": {
-        "type": "close",
-        "title": "Staff Report",
-        "description": (
-            "Please create an **Appeal** ticket instead. "
-            "Staff reports are for behaviour issues (e.g. racism, hacking), not punishment disputes."
-        ),
-    },
-    "staff punish no": {
-        "type": "prompt",
-        "title": "Staff Report",
-        "description": "Do you have proof of the staff member's behaviour (screenshots/videos)?",
-        "buttons": [
-            {"label": "Yes", "next": "staff proof yes", "opens_modal": True},
-            {"label": "No",  "next": "staff proof no"},
-        ],
-    },
-    "staff proof yes": {
-        "type": "modal",
-        "modal": {
-            "title": "Staff Report",
-            "fields": [
-                ("Your IGN",             "What is your in-game name?",    True),
-                ("Staff IGN",            "Who are you reporting?",         True),
-                ("Incident Description", "Describe what happened",         True),
-                ("Proof Link",           "Paste the proof link",           True),
-            ],
-            "result_title":       "Staff Report",
-            "result_description": "Thanks! Our managers and owners will review the report shortly.",
-            "ping_everyone":      True,
-        },
-    },
-    "staff proof no": {
-        "type": "close",
-        "title": "Staff Report",
-        "description": "Unfortunately, we cannot investigate any staff report without concrete evidence and proof.",
-    },
-}
-
 async def dispatch_node(interaction: discord.Interaction, node_id: str, channel: discord.TextChannel = None):
     if channel is None:
         channel = interaction.channel
@@ -602,9 +222,9 @@ async def dispatch_node(interaction: discord.Interaction, node_id: str, channel:
         buttons = []
         for btn in node.get("buttons", []):
             style = discord.ButtonStyle.grey
-            if "yes" in btn["label"].lower():
+            if btn["label"].lower() == "yes":
                 style = discord.ButtonStyle.green
-            elif "no" in btn["label"].lower():
+            elif btn["label"].lower() == "no":
                 style = discord.ButtonStyle.red
             buttons.append(SupportActionButton(label=btn["label"], custom_id=btn["next"], style=style, opens_modal=btn.get("opens_modal", False), channel=channel))
         view = SupportChoiceView(buttons)
@@ -624,109 +244,84 @@ async def dispatch_node(interaction: discord.Interaction, node_id: str, channel:
         await interaction.response.send_modal(SupportFormModal(title=cfg["title"], fields=cfg["fields"], submit_handler=submit, source_message=interaction.message))
 
 
-def build_registry() -> dict[str, tuple]:
-    registry: dict[str, tuple] = {}
+def register_new_nodes(bot, new_tree: dict):
+    newly_registered = []
 
     def register(node_id: str):
-        if node_id in registry:
+        if node_id in SUPPORT_HANDLER_REGISTRY:
             return
-            
-        node = SUPPORT_TREE.get(node_id)
+        node = new_tree.get(node_id)
         if not node:
             return
-            
         opens_modal = node["type"] == "modal"
-        
         async def handler(interaction: discord.Interaction, channel=None, node_id=node_id):
             if not await owner_only(interaction):
                 return
             await dispatch_node(interaction, node_id, channel=channel)
-            
-        registry[node_id] = (handler, opens_modal)
-        
+        SUPPORT_HANDLER_REGISTRY[node_id] = (handler, opens_modal)
+        newly_registered.append(node_id)
         for btn in node.get("buttons", []):
             register(btn["next"])
 
-    for root_id in SUPPORT_TREE.keys():
+    for root_id in new_tree.keys():
         register(root_id)
 
-    return registry
+    if newly_registered and bot is not None:
+        for i in range(0, len(newly_registered), 25):
+            chunk = newly_registered[i:i + 25]
+            persistent_view = SupportChoiceView()
+            for custom_id in chunk:
+                persistent_view.add_item(
+                    SupportActionButton(label="Button", custom_id=custom_id)
+                )
+            bot.add_view(persistent_view)
 
-SUPPORT_HANDLER_REGISTRY: dict[str, tuple] = build_registry()
+    return newly_registered
+
+
+async def fetch_tree_api() -> dict | None:
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "http://mysticraft.xyz/api/admin/ticket-tree",
+                headers={"x-api-key": os.environ.get("TICKET_TREE_API_KEY")},
+                timeout=aiohttp.ClientTimeout(total=8)
+            ) as resp:
+                if resp.status != 200:
+                    print(f"[Ticket Tree] API returned HTTP {resp.status}, keeping existing tree.")
+                    return None
+                data = await resp.json()
+                if not isinstance(data, dict):
+                    print(f"[Ticket Tree] API returned non-object JSON, keeping existing tree.")
+                    return None
+                return data
+    except asyncio.TimeoutError:
+        print("[Ticket Tree] API fetch timed out, keeping existing tree.")
+        return None
+    except Exception as e:
+        print(f"[Ticket Tree] API fetch error: {e}, keeping existing tree.")
+        return None
+
+
+async def tree_poll_loop(bot):
+    await bot.wait_until_ready()
+    print(f"[Ticket Tree] Starting poll loop (every 5s) from http://mysticraft.xyz/api/admin/ticket-tree")
+    while not bot.is_closed():
+        new_tree = await fetch_tree_api()
+        if new_tree is not None and new_tree != SUPPORT_TREE:
+            added = set(new_tree) - set(SUPPORT_TREE)
+            removed = set(SUPPORT_TREE) - set(new_tree)
+            SUPPORT_TREE.clear()
+            SUPPORT_TREE.update(new_tree)
+            newly = register_new_nodes(bot, new_tree)
+            print(f"[Ticket Tree] Tree updated — +{len(added)} nodes, -{len(removed)} nodes"
+                  + (f", {len(newly)} newly registered with bot" if newly else ""))
+        await asyncio.sleep(5)
 
 async def start_support_tree(interaction: discord.Interaction, ticket_channel: discord.TextChannel, selected_key: str):
     print(f"Starting support tree with key {selected_key} in channel {ticket_channel.id}")
     await dispatch_node(interaction, selected_key, channel=ticket_channel)
 
-class TicketQuestionsModal(discord.ui.Modal, title="Ticket Information"):
-    def __init__(self, category: str):
-        super().__init__()
-        self.category = category
-        questions = {
-            # Support Server
-            "General Support": [
-                ("IGN (case-sensitive)", "What is your in-game name?", True),
-                ("Platform", "What platform are you on?", True),
-                ("Issue", "Describe your issue in detail", True),
-            ],
-            "Billing Support": [
-                ("IGN (case-sensitive)", "What is your in-game name?", True),
-                ("Item", "What did you purchase?", True),
-                ("Transaction ID", "Transaction ID/Email", True),
-            ],
-            "Appeals": [
-                ("IGN (case-sensitive)", "What is your in-game name?", True),
-                ("Punishment ID", "What is the punishment ID (if known)?", False),
-                ("Punishment Reason", "Why were your punished? Was it fair?", True),
-                ("Appeal Reason", "Why should we remove your punishment?", True),
-            ],
-            "Player Reports": [
-                ("IGN (case-sensitive)", "What is your in-game name?", True),
-                ("Offender", "Offending player's in-game name", True),
-                ("Reason", "What did they do?", True),
-                ("Proof", "Links to screenshots/videos (required)", True),
-            ],
-            "Staff Reports": [
-                ("Offender", "Who are you reporting?", True),
-                ("Reason", "What did they do?", True),
-                ("Proof", "Links to screenshots/videos (required)", True),
-            ],
-            "Bug Reports": [
-                ("IGN (case-sensitive)", "What is your in-game name?", True),
-                ("Bug", "Describe the bug and how to reproduce it", True),
-                ("Media", "Links to screenshots/videos (if any)", False),
-            ],
-            # Tierlist Server
-            "General Support Tierlist": [
-                ("Issue", "Describe your issue in detail", True),
-            ],
-            "Tester Application Tierlist": [
-                ("Gamemode", "Which gamemode(s) are you applying for?", True),
-                ("Account Status", "Are you using a cracked/premium account?", True),
-            ],
-            "High Testing Tierlist": [
-                ("Gamemode", "Which gamemode are you testing? Enter 1 only.", True),
-            ],
-            "Tier Migration Tierlist": [
-                ("Server", "Which tierlist are you migrating from?", True),
-                ("Result Message", "Share the result link, or forward message", False),
-            ],
-            "Staff Application Tierlist": [
-                ("Age", "How old are you?", True),
-                ("Country & Timezone", "Where do you live? Timezone?", True),
-                ("Account Status", "Are you using a cracked/premium account?", True),
-                ("Staff Experience", "List your previous staff experience", True),
-                ("Hours Per Week", "How many hours per week can you dedicate?", True),
-            ],
-        }
-
-        for field in questions.get(category, []):
-            self.add_item(discord.ui.TextInput(label=field[1],placeholder=field[0],required=field[2],custom_id=field[0]))
-
-    async def on_submit(self, interaction: discord.Interaction):
-        self.answers = {item.custom_id: item.value for item in self.children}
-        self.on_submit_interaction = interaction
-        await interaction.response.defer(ephemeral=True, thinking=True)
 
 async def setup(bot):
     all_ids = list(SUPPORT_HANDLER_REGISTRY.keys())
@@ -734,5 +329,14 @@ async def setup(bot):
         chunk = all_ids[i:i + 25]
         persistent_view = SupportChoiceView()
         for custom_id in chunk:
-            persistent_view.add_item(SupportActionButton(label="Ghost", custom_id=custom_id))
+            persistent_view.add_item(SupportActionButton(label="Button", custom_id=custom_id))
         bot.add_view(persistent_view)
+
+    initial = await fetch_tree_api()
+    if initial is not None and initial != SUPPORT_TREE:
+        SUPPORT_TREE.clear()
+        SUPPORT_TREE.update(initial)
+        register_new_nodes(bot, initial)
+        print("[Ticket Tree] Initial tree loaded from API.")
+
+    bot.loop.create_task(tree_poll_loop(bot))
