@@ -10,7 +10,7 @@ SUPPORT_TREE: dict[str, dict] = {}
 SUPPORT_HANDLER_REGISTRY: dict[str, tuple] = {}
 
 async def is_linked(user, client):
-    """Return (linked, ign) for a member using the linking table or main-server nickname fallback."""
+    """Return (linked, ign) for a member using the linking table"""
     try:
         async with client.tllink_pool.acquire() as conn:
             async with conn.cursor() as cursor:
@@ -27,26 +27,26 @@ async def is_linked(user, client):
         print(f"Error fetching linked IGN for {user.id}: {e}")
         pass
 
-    try:
-        main_guild = client.get_guild(SERVER_IDS["main"])
-        member = main_guild.get_member(user.id)
-        if member is None:
-            member = await main_guild.fetch_member(user.id)
+    # try:
+    #     main_guild = client.get_guild(SERVER_IDS["main"])
+    #     member = main_guild.get_member(user.id)
+    #     if member is None:
+    #         member = await main_guild.fetch_member(user.id)
 
-        if member is None:
-            return False, None
+    #     if member is None:
+    #         return False, None
 
-        linked_role = main_guild.get_role(ROLE_IDS[SERVER_IDS["main"]]["linked"])
-        if linked_role not in member.roles:
-            return False, None
+    #     linked_role = main_guild.get_role(ROLE_IDS[SERVER_IDS["main"]]["linked"])
+    #     if linked_role not in member.roles:
+    #         return False, None
 
-        nickname = member.nick or member.display_name or ""
-        match = re.search(r"\[(.+?)\]$", nickname)
-        if match:
-            return True, match.group(1).strip()
-    except Exception as e:
-        print(e)
-        pass
+    #     nickname = member.nick or member.display_name or ""
+    #     match = re.search(r"\[(.+?)\]$", nickname)
+    #     if match:
+    #         return True, match.group(1).strip()
+    # except Exception as e:
+    #     print(e)
+    #     pass
 
     return False, None
 
@@ -151,10 +151,6 @@ async def post_support_outcome(interaction, *, title: str, description: str, col
         await channel.set_permissions(owner, send_messages=True, read_messages=True, attach_files=True)
         embed.set_footer(text="You can now type in the ticket and send any followup information")
 
-    if "link" in title.lower():
-        embed.set_image(url="https://media.discordapp.net/attachments/741540685852835871/1500668562178572428/Screenshot_20260503-182038.Discord.png?ex=69f94602&is=69f7f482&hm=6d563648ab50f0c3b00dcae99d02b55f6b5cbece7c2ef3131ef9b4ae2a38a136&=")
-        embed.set_footer(text="DM the code to one of these bots depending on which gamemode you use /link in")
-
     content = "@everyone" if ping_everyone else (ping_role.mention if ping_role is not None else None)
     await channel.send(content=content, embed=embed, view=view)
 
@@ -175,9 +171,6 @@ async def send_instructions(interaction, title: str, description: str, view: dis
     for item in close_view.children:
         view.add_item(item)
     embed = discord.Embed(title=title, description=description, color=0x4F9EF5)
-    if "link" in title.lower():
-        embed.set_image(url="https://media.discordapp.net/attachments/741540685852835871/1500668562178572428/Screenshot_20260503-182038.Discord.png?ex=69f94602&is=69f7f482&hm=6d563648ab50f0c3b00dcae99d02b55f6b5cbece7c2ef3131ef9b4ae2a38a136&=")
-        embed.set_footer(text="DM the code to one of these bots depending on which gamemode you use /link in")
     await channel.send(embed=embed, view=view)
 
 async def dispatch_node(interaction: discord.Interaction, node_id: str, channel: discord.TextChannel = None, context: dict = None):

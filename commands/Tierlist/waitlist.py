@@ -13,6 +13,8 @@ from discord.ext import commands
 from firebase_admin import db
 from typing import List, Dict
 
+from constants import ROLE_IDS, SERVER_IDS
+
 # Tier definitions for rep roles
 TIER_THRESHOLDS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 190, 220, 250, 290, 330, 370, 420, 470, 500]
 TIER_NAMES = [
@@ -88,7 +90,6 @@ def return_item(obj):
     return item
 
 AUTHORIZED_USERS = [692254240290242601, 840972960793100309]
-LINKED_ROLE_ID = 1459863162223595656
 LINKED_LOG_CHANNEL_ID = 1460005738897473706
 RESTRICTED_ROLE_ID = 1340417478857068564
 
@@ -601,11 +602,11 @@ class WaitlistSelection(discord.ui.Select):
             else:
                 embed.set_author(name=interaction.user.name)
             embeds.append(embed)
-            if LINKED_ROLE_ID not in [role.id for role in interaction.user.roles]:
+            if ROLE_IDS[SERVER_IDS["tierlist"]]["linked"] not in [role.id for role in interaction.user.roles]:
                 embeds.append(
                     discord.Embed(
                         title="<:warn:1459986909911842846> **Account Linking Required for Testing**",
-                        description=f"> To be eligible for testing, you must follow the instructions in <#1460525451368861818> to get linked. Once completed, you will automatically receive the <@&{LINKED_ROLE_ID}> role and gain access to the queue.",
+                        description=f"> To be eligible for testing, you must follow the instructions in <#1460525451368861818> to get linked. Once completed, you will automatically receive the <@&{ROLE_IDS[SERVER_IDS["tierlist"]]["linked"]}> role and gain access to the queue.",
                         color=discord.Colour.red(),
                     )
                 )
@@ -626,11 +627,11 @@ class JoinQueueButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if await _deny_if_restricted(interaction, interaction.user):
             return
-        if LINKED_ROLE_ID not in [role.id for role in interaction.user.roles]:
+        if ROLE_IDS[SERVER_IDS["tierlist"]]["linked"] not in [role.id for role in interaction.user.roles]:
             return await interaction.response.send_message(
                 embed=discord.Embed(
                     title="<:warn:1459986909911842846> **Account Linking Required for Testing**",
-                    description=f"> To be eligible for testing, you must follow the instructions in <#1460525451368861818> to get linked. Once completed, you will automatically receive the <@&{LINKED_ROLE_ID}> role and gain access to the queue.",
+                    description=f"> To be eligible for testing, you must follow the instructions in <#1460525451368861818> to get linked. Once completed, you will automatically receive the <@&{ROLE_IDS[SERVER_IDS["tierlist"]]["linked"]}> role and gain access to the queue.",
                     color=discord.Colour.red(),
                 ),
                 ephemeral=True,
@@ -983,7 +984,7 @@ class WaitlistCmd(commands.GroupCog, name="waitlist"):
         await interaction.response.defer()
         
         # Check if target is linked
-        if LINKED_ROLE_ID not in [role.id for role in user.roles]:
+        if ROLE_IDS[SERVER_IDS["tierlist"]]["linked"] not in [role.id for role in user.roles]:
             return await interaction.followup.send(
                 "<:cross1:1339153202859474956> This player is not linked. They must link their account to receive results.",
                 ephemeral=True
@@ -1040,7 +1041,7 @@ class WaitlistCmd(commands.GroupCog, name="waitlist"):
             )
 
         # Tester Link Check
-        if LINKED_ROLE_ID not in [role.id for role in interaction.user.roles]:
+        if ROLE_IDS[SERVER_IDS["tierlist"]]["linked"] not in [role.id for role in interaction.user.roles]:
             return await interaction.followup.send(
                 "<:cross1:1339153202859474956> As a tester yourself, you must also have your account linked.", 
                 embed=discord.Embed(
@@ -1211,7 +1212,7 @@ class WaitlistCmd(commands.GroupCog, name="waitlist"):
             )
 
         # Check linking
-        if LINKED_ROLE_ID not in [role.id for role in user.roles]:
+        if ROLE_IDS[SERVER_IDS["tierlist"]]["linked"] not in [role.id for role in user.roles]:
             return await interaction.followup.send(
                 "<:cross1:1339153202859474956> This player is not linked. They must link their account to receive results.",
                 ephemeral=True
@@ -1582,7 +1583,7 @@ class WaitlistCmd(commands.GroupCog, name="waitlist"):
                     current_rank = role.name.split(" ")[0]
                     break
 
-        has_linked = nextMember and LINKED_ROLE_ID in [role.id for role in nextMember.roles]
+        has_linked = nextMember and ROLE_IDS[SERVER_IDS["tierlist"]]["linked"] in [role.id for role in nextMember.roles]
         display_ign = linked_ign if linked_ign != "None" else "Not Linked"
 
         embed = discord.Embed(title=f"Testing Session for {nextMember.name if nextMember else str(nextID)}", description="> **Reminder for testers:** Verify the player's Minecraft account matches the one below before testing. If they changed their name, ask the player to [link](https://ptb.discord.com/channels/1304829305443844096/1460525451368861818) their accounts again.", color=discord.Colour.blue())
@@ -1832,6 +1833,15 @@ class Waitlist(commands.Cog):
                 ign = match_ign.group(1).strip()
                 discord_id = int(match_discord.group(1))
 
+                tierlist_guild = self.client.get_guild(SERVER_IDS["tierlist"])
+                main_guild = self.client.get_guild(SERVER_IDS["main"])
+                tierlist_member = tierlist_guild.get_member(discord_id)
+                main_member = main_guild.get_member(discord_id)
+                if tierlist_member is not None:
+                    await tierlist_member.add_roles(tierlist_guild.get_role(ROLE_IDS[SERVER_IDS["tierlist"]]["linked"]))
+                if main_member is not None:
+                    await main_member.add_roles(main_guild.get_role(ROLE_IDS[SERVER_IDS["main"]]["linked"]))
+
                 try:
                     async with self.client.tllink_pool.acquire() as conn:
                         async with conn.cursor() as cursor:
@@ -1855,7 +1865,6 @@ class Waitlist(commands.Cog):
                             pass
                     
                     if member:
-
                         # Update past entries that match this user's UUID
                         try:
                             async with self.client.tllink_pool.acquire() as conn2:
@@ -2037,17 +2046,17 @@ class Waitlist(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
-        linked_role = before.guild.get_role(LINKED_ROLE_ID)
+        linked_role = before.guild.get_role(ROLE_IDS[SERVER_IDS["tierlist"]]["linked"])
         if linked_role and linked_role in before.roles and linked_role not in after.roles:
             embed = discord.Embed(
-                description=f"{after.mention} has un<@&1459863162223595656> their account.",
+                description=f"{after.mention} has un<@&{ROLE_IDS[SERVER_IDS["tierlist"]]["linked"]}> their account.",
                 color=discord.Color.red()
             )
             channel = self.client.get_channel(LINKED_LOG_CHANNEL_ID)
             await channel.send(embed=embed)
         elif linked_role and linked_role not in before.roles and linked_role in after.roles:
             embed = discord.Embed(
-                description=f"{after.mention} has <@&1459863162223595656> their account.",
+                description=f"{after.mention} has <@&{ROLE_IDS[SERVER_IDS["tierlist"]]["linked"]}> their account.",
                 color=discord.Color.green()
             )
             channel = self.client.get_channel(LINKED_LOG_CHANNEL_ID)

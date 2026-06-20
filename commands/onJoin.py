@@ -3,6 +3,9 @@ import discord
 from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont
 
+from constants import ROLE_IDS, SERVER_IDS
+from commands.Tickets.tree import is_linked
+
 async def create_welcome_image(
     user: discord.Member,
     background_path: str = "./assets/image.png",
@@ -68,7 +71,7 @@ class OnMemberJoin(commands.Cog):
                 except discord.Forbidden:
                     pass
 
-        if member.guild.id == 1136662635039952988:
+        if member.guild.id == SERVER_IDS["main"]:
             welcome_channel = self.bot.get_channel(1139141336541429841)
             image_channel = self.bot.get_channel(1026904121237831700)
 
@@ -82,11 +85,17 @@ class OnMemberJoin(commands.Cog):
             image_message = await image_channel.send(file=discord.File(image_path))
             image_url = image_message.attachments[0].proxy_url
 
+            if await is_linked(member, self.bot):
+                await member.add_roles(member.guild.get_role(ROLE_IDS[SERVER_IDS["main"]]["linked"]), reason="Auto-assign Linked role")
+                msg = "You have been automatically assigned the Linked role since you have linked your account before."
+            else:
+                msg = ""
+
             # Embed
             embed = discord.Embed(
                 title=f"Welcome to {member.guild.name}!",
                 description=(
-                    f"Hey there {member.mention}, thanks for joining us! "
+                    f"Hey there {member.mention}, thanks for joining us! {msg}"
                     f"Here are some channels to get you started!\n\n"
                     f"[#📄〡rules](https://discord.com/channels/1136662635039952988/1136672661859217489) "
                     f"・ Read the rules carefully!\n"
@@ -112,14 +121,20 @@ class OnMemberJoin(commands.Cog):
             except discord.Forbidden:
                 pass
             
-        elif member.guild.id == 1304829305443844096:
+        elif member.guild.id == SERVER_IDS["tierlist"]:
             welcome_channel = self.bot.get_channel(1473944522030452919)
             if not welcome_channel:
                 return
             member_count = member.guild.member_count
+
+            if await is_linked(member, self.bot):
+                await member.add_roles(member.guild.get_role(ROLE_IDS[SERVER_IDS["tierlist"]]["linked"]), reason="Auto-assign Linked role")
+                msg = "You have been automatically assigned the Linked role since you have linked your account before. "
+            else:
+                msg = "Verify yourself by following <#1460525451368861818>"
             embed = discord.Embed(
                 title=f"Welcome to {member.guild.name}!",
-                description=f"Hello {member.mention}, thanks for joining us! \n\n- Verify yourself by following <#1460525451368861818>\n- Join the testing waitlist for all gamemodes at <#1304842299376799857>\n- Need help? Reach out in <#1338567467076685885>",
+                description=f"Hello {member.mention}, thanks for joining us! \n\n- {msg}\n- Join the testing waitlist for all gamemodes at <#1304842299376799857>\n- Need help? Reach out in <#1338567467076685885>",
                 color=0x0EB1E1,
             ).set_footer(
                 text=f"You are the {ordinal(member_count)} member in the server.",
@@ -130,7 +145,6 @@ class OnMemberJoin(commands.Cog):
                 await member.send(embed=embed)
             except discord.Forbidden:
                 pass
-            
             
 
 async def setup(bot: commands.Bot):
