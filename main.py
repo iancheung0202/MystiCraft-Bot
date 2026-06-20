@@ -23,6 +23,7 @@ from commands.Tierlist.ht_waitlist import HTWaitlistSelectionView, ApproveDenyVi
 # from commands.Help.help import HelpPanel
 from commands.onMessage import SelfRoles
 from commands.Utility.staff import RefreshStaffView
+from commands.Utility.loa import LOAPanelView
 from commands.Tickets.summary import Stats
 from commands.Utility.registration import RegistrationButtonView
 
@@ -94,6 +95,7 @@ class MystiCraft(commands.Bot):
         self.add_view(AppealCloseTicketButton())
         self.add_view(RegistrationButtonView())
         self.add_view(FindTicketView())
+        self.add_view(LOAPanelView())
 
     async def logging(self):
         def pacific_time_converter(*args):

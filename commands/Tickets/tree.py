@@ -24,7 +24,7 @@ async def is_linked(user, client):
                 row = await cursor.fetchone()
                 return (True, row[0]) if row else (False, None)
     except Exception as e:
-        print(f"Error fetching linked IGN for {discord_id}: {e}")
+        print(f"Error fetching linked IGN for {user.id}: {e}")
         pass
 
     try:
@@ -215,29 +215,37 @@ async def dispatch_node(interaction: discord.Interaction, node_id: str, channel:
             await dispatch_node(interaction, outcome, channel=channel, context={"ign": context_value})
         return
 
+    def parse_hex_color(raw_color, default_color):
+        if isinstance(raw_color, str):
+            try:
+                return int(raw_color, 16)
+            except ValueError:
+                return default_color
+        return raw_color if raw_color is not None else default_color
+
     if (kind == "prompt"):
         buttons = []
         for btn in node.get("buttons", []):
-            style = discord.ButtonStyle.grey
-            if btn["label"].lower() == "yes":
+            json_style = btn.get("style", "").lower()
+            if json_style == "green" or btn["label"].lower() == "yes":
                 style = discord.ButtonStyle.green
-            elif btn["label"].lower() == "no":
+            elif json_style == "red" or btn["label"].lower() == "no":
                 style = discord.ButtonStyle.red
+            else:
+                style = discord.ButtonStyle.grey
             buttons.append(SupportActionButton(label=btn["label"], custom_id=btn["next"], style=style, opens_modal=btn.get("opens_modal", False), channel=channel))
         view = SupportChoiceView(buttons)
         await send_instructions(interaction, title=node["title"], description=description, view=view, channel=channel)
+        
     elif (kind == "close"):
-        await send_close_button(interaction, node["title"], description, color=node.get("color", 0xFF0000), channel=channel)
+        # FIXED: Now parsing the string color before forwarding it
+        color_int = parse_hex_color(node.get("color"), 0xFF0000)
+        await send_close_button(interaction, node["title"], description, color=color_int, channel=channel)
+        
     elif (kind == "final"):
-        raw_color = node.get("color", 0x4F9EF5)
-        if isinstance(raw_color, str):
-            try:
-                color_int = int(raw_color, 16)
-            except ValueError:
-                color_int = 0x4F9EF5 
-        else:
-            color_int = raw_color
+        color_int = parse_hex_color(node.get("color"), 0x4F9EF5)
         await send_final(interaction, node["title"], description, data=node.get("data"), color=color_int, ping_everyone=node.get("ping_everyone", False), channel=channel)
+        
     elif (kind == "modal"):
         cfg = node["modal"]
         async def submit(obj, data, _cfg=cfg, current_channel=channel):
@@ -247,7 +255,6 @@ async def dispatch_node(interaction: discord.Interaction, node_id: str, channel:
                 view = AppealCloseTicketButton()
             await send_final(obj, _cfg["result_title"], _cfg["result_description"], data, view=view, ping_everyone=_cfg.get("ping_everyone", False), channel=current_channel)
         await interaction.response.send_modal(SupportFormModal(title=cfg["title"], fields=cfg["fields"], submit_handler=submit, source_message=interaction.message))
-
 
 def register_new_nodes(bot, new_tree: dict):
     newly_registered = []
@@ -304,7 +311,7 @@ async def fetch_tree_api() -> dict | None:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 "http://mysticraft.xyz/api/admin/ticket-tree",
-                headers={"x-api-key": os.environ.get("TICKET_TREE_API_KEY")},
+                headers={"x-api-key": os.environ.get("BOT_ACCESS_API_KEY")},
                 timeout=aiohttp.ClientTimeout(total=8)
             ) as resp:
                 if resp.status != 200:
