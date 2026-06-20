@@ -1,4 +1,5 @@
 import discord
+import re
 
 from discord.ext import commands
 from discord.ui import Button, View
@@ -116,7 +117,11 @@ class onMsg(commands.Cog):
             return
         
         # MrBeast scam detection: 4 attachments all named "image.jpeg"
-        if len(message.attachments) >= 4 or "check my bio" in message.content.lower():
+        if (
+            len(message.attachments) >= 4 
+            or len(re.findall(r'https?://[^\s]*discordapp[^\s]*attachment[^\s]*', message.content.lower())) >= 4 
+            or "check my bio" in message.content.lower()
+        ):
             # if all(attachment.filename == "image.jpeg" for attachment in message.attachments):
                 try:
                     await message.delete()
