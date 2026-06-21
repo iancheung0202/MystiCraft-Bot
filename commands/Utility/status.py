@@ -23,6 +23,7 @@ EMOJI_CLOCK = "<:mc_clock:1518027805361967104>"
 EMOJI_CONNECT = "<:lodestone:1518038285354795158>"
 EMOJI_WEBSITE = "<:map:1518038367521210499>"
 EMOJI_TICKET = "<:book:1518051136488214549>"
+EMOJI_STORE = "<:shop:1518114830501023935>"
 EMOJI_TIERLIST = "<:crystal:1518050761010057290>"
 
 SERVER_THUMBNAIL_URL = "https://mysticraft.xyz/images/logo-96.png"
@@ -433,13 +434,13 @@ class StatusView(discord.ui.LayoutView):
             url="https://mysticraft.xyz"
         )
         self.action_row.add_item(website_button)
-        ticket_button = discord.ui.Button(
-            label="Tickets",
-            emoji=EMOJI_TICKET,
+        store_button = discord.ui.Button(
+            label="Store",
+            emoji=EMOJI_STORE,
             style=discord.ButtonStyle.link,
-            url="https://discord.gg/W735Rtgy4D"
+            url="https://store.mysticraft.xyz"
         )
-        self.action_row.add_item(ticket_button)
+        self.action_row.add_item(store_button)
         tierlist_button = discord.ui.Button(
             label="Tierlist",
             emoji=EMOJI_TIERLIST,
@@ -447,6 +448,20 @@ class StatusView(discord.ui.LayoutView):
             url="https://tierlist.mysticraft.xyz"
         )
         self.action_row.add_item(tierlist_button)
+        ticket_button = discord.ui.Button(
+            label="Tickets",
+            emoji=EMOJI_TICKET,
+            style=discord.ButtonStyle.link,
+            url="https://discord.gg/W735Rtgy4D"
+        )
+        self.action_row.add_item(ticket_button)
+        staff_list_button = discord.ui.Button(
+            label="Staff",
+            emoji=EMOJI_PLAYERS,
+            style=discord.ButtonStyle.link,
+            url="https://mysticraft.xyz/staff"
+        )
+        self.action_row.add_item(staff_list_button)
         self.add_item(self.action_row)
 
     @classmethod

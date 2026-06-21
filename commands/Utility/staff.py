@@ -1,6 +1,8 @@
+import os
 import discord
 import datetime
 import re
+import aiohttp
 
 from discord.ui import Button, View, Select, UserSelect
 
@@ -8,6 +10,8 @@ from constants import ROLE_IDS, SERVER_IDS, EMOTES
 
 ORDERED_STAFF_KEYS = ["owner", "manager", "senior_admin", "admin", "developer", "senior_mod", "mod", "helper"]
 ABBREVIATIONS = {"owner": "Owner", "manager": "Manager", "senior_admin": "Sr Admin", "admin": "Admin", "developer": "Dev", "senior_mod": "Sr Mod", "mod": "Mod", "helper": "Helper"}
+WEBSITE_ROLE_NAMES = {"owner": "Owner", "manager": "Manager", "senior_admin": "Senior Administrator", "admin": "Administrator", "developer": "Developer", "senior_mod": "Senior Moderator", "mod": "Moderator", "helper": "Helper"}
+WEBSITE_STAFF_API = "https://mysticraft.xyz/api"
 STAFF_SERVER_ROLES = [ROLE_IDS[SERVER_IDS["staff"]]["roles"][k] for k in ORDERED_STAFF_KEYS]
 MAIN_SERVER_ROLES = [ROLE_IDS[SERVER_IDS["main"]]["roles"][k] for k in ORDERED_STAFF_KEYS]
 SUPPORT_SERVER_ROLES = [ROLE_IDS[SERVER_IDS["support"]]["roles"][k] for k in ORDERED_STAFF_KEYS]
@@ -18,6 +22,95 @@ def format_nickname(abbreviation: str, display_name: str) -> str:
     if "|" in display_name:
         display_name = display_name.split("|", 1)[-1].strip()
     return f"{abbreviation} | {display_name}"
+
+async def sync_staff_to_website(client: discord.Client, active_staff: dict, guild_staff: discord.Guild, target_ids: set | None) -> list[str]:
+    """Push the resolved staff roster to the website's bot-only staff endpoints."""
+    from commands.Tickets.tree import is_linked
+
+    api_key = os.environ.get("BOT_ACCESS_API_KEY")
+
+    headers = {"x-api-key": api_key, "Content-Type": "application/json"}
+    report: list[str] = []
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(f"{WEBSITE_STAFF_API}/staff") as resp:
+                if resp.status != 200:
+                    return [f"[!] Website sync aborted: GET /api/staff returned {resp.status}."]
+                website_staff = await resp.json()
+        except Exception as e:
+            return [f"[!] Website sync aborted: failed to reach /api/staff ({e})."]
+
+        website_by_username = {s["username"].lower(): s for s in website_staff}
+
+        for discord_id, rank in active_staff.items():
+            if rank == "tierlist_only":
+                continue
+
+            member = guild_staff.get_member(discord_id)
+            if member is None:
+                continue
+
+            try:
+                linked, ign = await is_linked(member, client)
+            except Exception as e:
+                report.append(f"[!] {member.display_name}: is_linked() raised {e}")
+                continue
+            if not linked or not ign:
+                report.append(f"[ ] {member.display_name}: not linked, skipped website sync")
+                continue
+
+            role_key = ORDERED_STAFF_KEYS[rank]
+            website_role = WEBSITE_ROLE_NAMES[role_key]
+            existing = website_by_username.get(ign.lower())
+
+            try:
+                if existing is None:
+                    async with session.post(f"{WEBSITE_STAFF_API}/admin/staff", json={"username": ign, "role": website_role}, headers=headers) as resp:
+                        if resp.status == 200:
+                            report.append(f"[+] Website: added {ign} as {website_role}")
+                        else:
+                            body = await resp.text()
+                            report.append(f"[!] Website: failed to add {ign} ({resp.status}: {body[:200]})")
+                elif existing["role"] != website_role or existing["username"] != ign:
+                    async with session.put(f"{WEBSITE_STAFF_API}/admin/staff/{existing['id']}", json={"username": ign, "role": website_role}, headers=headers) as resp:
+                        if resp.status == 200:
+                            report.append(f"[~] Website: updated {ign} to {website_role}")
+                        else:
+                            body = await resp.text()
+                            report.append(f"[!] Website: failed to update {ign} ({resp.status}: {body[:200]})")
+            except Exception as e:
+                report.append(f"[!] Website: error syncing {ign} ({e})")
+                continue
+
+        if target_ids is None:
+            synced_igns = set()
+            for discord_id, rank in active_staff.items():
+                if rank == "tierlist_only":
+                    continue
+                member = guild_staff.get_member(discord_id)
+                if member is None:
+                    continue
+                try:
+                    linked, ign = await is_linked(member, client)
+                except Exception:
+                    continue
+                if linked and ign:
+                    synced_igns.add(ign.lower())
+
+            for entry in website_staff:
+                if entry["username"].lower() not in synced_igns:
+                    try:
+                        async with session.delete(f"{WEBSITE_STAFF_API}/admin/staff/{entry['id']}", headers=headers) as resp:
+                            if resp.status == 200:
+                                report.append(f"[-] Website: removed {entry['username']} (no longer staff or not linked)")
+                            else:
+                                report.append(f"[!] Website: failed to remove {entry['username']} ({resp.status})")
+                    except Exception as e:
+                        report.append(f"[!] Website: error removing {entry['username']} ({e})")
+                        continue
+
+    return report
 
 async def check_permissions(interaction, target_user=None, new_role_value=None):
     user_role_ids = {r.id for r in interaction.user.roles}
@@ -102,6 +195,8 @@ async def global_sync(client: discord.Client, member: discord.Member | None = No
                 if m.id not in active_staff:
                     active_staff[m.id] = "tierlist_only"
         target_ids = None  # means "all"
+
+    website_report = await sync_staff_to_website(client, active_staff, guild_staff, target_ids)
 
     ### Sync roles & nicknames on staff, main, and support servers
     servers = [
@@ -283,12 +378,18 @@ async def global_sync(client: discord.Client, member: discord.Member | None = No
                         if staff_base_role and staff_base_role in staff_member.roles:
                             pass
 
-    if not changes_performed:
+    if not changes_performed and not website_report:
         if member is not None:
             return "No role or nickname changes were necessary for this user."
         return "No role changes were necessary. All servers are perfectly synchronized!"
 
-    return f"The following `{len(changes_performed)}` operations were performed:\n```diff\n" + "\n".join(changes_performed) + "\n```"
+    sections = []
+    if changes_performed:
+        sections.append(f"The following `{len(changes_performed)}` operations were performed:\n```diff\n" + "\n".join(changes_performed) + "\n```")
+    if website_report:
+        sections.append(f"[Website sync](https://mysticraft.xyz/staff) (`{len(website_report)}` items):\n```diff\n" + "\n".join(website_report) + "\n```")
+
+    return "\n".join(sections)
 
 
 class StaffReasonModal(discord.ui.Modal):
@@ -528,7 +629,7 @@ class EditStaffView(ReasonView, View):
         await interaction.response.defer(thinking=True, ephemeral=True)
 
         if action is None:
-            await interaction.followup.send(f"**No changes made to {staff_member.mention}.** They are already a **{new_role_mention}!", ephemeral=True)
+            await interaction.followup.send(f"**No changes made** to {staff_member.mention}. They are already a **{new_role_mention}!", ephemeral=True)
             return
 
         audit_log_report = await global_sync(interaction.client, staff_member)
@@ -788,6 +889,15 @@ class EditTierlistStaffView(ReasonView, View):
 class RefreshStaffView(View):
     def __init__(self):
         super().__init__(timeout=None)
+        self.add_item(
+            discord.ui.Button(
+                label="Staff Directory", 
+                style=discord.ButtonStyle.link, 
+                url="https://mysticraft.xyz/staff", 
+                emoji="<a:globe:1366940841829994557>", 
+                row=1
+            )
+        )
 
     @discord.ui.button(label="Edit Staff Rank", style=discord.ButtonStyle.red, custom_id="edit_staff", emoji="✏️", row=0)
     async def edit_staff(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -891,7 +1001,8 @@ class RefreshStaffView(View):
             description=(
                 "Being one of the most unique features of any Discord server network, this custom panel handles cross-server **rank updates, role syncing, and nickname formatting**, all with a simple interface and few easy clicks.\n\n"
                 "**This panel is always the single source of truth** for all staff ranks/roles. Editing ranks will first be applied to the staff server and will automatically be propagated to the main, support, and tierlist servers. "
-                "**Never assign or remove roles in any server manually!** Always use this panel's buttons."
+                "**Never assign or remove roles in any server manually!** Always use this panel's buttons.\n\n"
+                "If you are a staff member and wish to show up on [Staff Directory](https://mysticraft.xyz/staff), make sure [your Minecraft account is linked](https://discord.com/channels/1136662635039952988/1518004795275874405). Once linked, you can click `Sync` on this panel to update your status on the website as well."
             ),
             color=0x1ec7f1,
         )
