@@ -10,6 +10,7 @@ import logging
 import pytz
 import aiomysql
 import os
+import asyncpg
 
 from dotenv import load_dotenv
 from discord.ext import commands
@@ -47,6 +48,14 @@ class MystiCraft(commands.Bot):
         )
 
     async def setup_hook(self):
+        bot.chatgames_pool = await asyncpg.create_pool(
+            database=os.environ.get("POSTGRESQL_DATABASE_NAME"),
+            user=os.environ.get("POSTGRESQL_DATABASE_USER"),
+            password=os.environ.get("POSTGRESQL_DATABASE_PASSWORD"),
+            host=os.environ.get("POSTGRESQL_DATABASE_HOST"),
+            port=int(os.environ.get("POSTGRESQL_DATABASE_PORT")), 
+        )
+
         for path, subdirs, files in os.walk("commands"):
             for name in files:
                 if name.endswith(".py"):
