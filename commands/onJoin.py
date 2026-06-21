@@ -84,10 +84,11 @@ class OnMemberJoin(commands.Cog):
             image_path = await create_welcome_image(member)
             image_message = await image_channel.send(file=discord.File(image_path))
             image_url = image_message.attachments[0].proxy_url
-
-            if await is_linked(member, self.bot):
+            
+            linked, ign = await is_linked(member, self.bot)
+            if linked:
                 await member.add_roles(member.guild.get_role(ROLE_IDS[SERVER_IDS["main"]]["linked"]), reason="Auto-assign Linked role")
-                msg = "You have been automatically assigned the Linked role since you have linked your account before."
+                msg = f"You have been automatically assigned the Linked role since you have linked your Minecraft account (`{ign}`) before."
             else:
                 msg = ""
 
@@ -127,9 +128,10 @@ class OnMemberJoin(commands.Cog):
                 return
             member_count = member.guild.member_count
 
-            if await is_linked(member, self.bot):
+            linked, ign = await is_linked(member, self.bot)
+            if linked:
                 await member.add_roles(member.guild.get_role(ROLE_IDS[SERVER_IDS["tierlist"]]["linked"]), reason="Auto-assign Linked role")
-                msg = "You have been automatically assigned the Linked role since you have linked your account before. "
+                msg = f"You have been automatically assigned the Linked role since you have linked your Minecraft account (`{ign}`) before. "
             else:
                 msg = "Verify yourself by following <#1460525451368861818>"
             embed = discord.Embed(

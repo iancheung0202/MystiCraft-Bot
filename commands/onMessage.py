@@ -4,7 +4,7 @@ import re
 from discord.ext import commands
 from discord.ui import Button, View
 
-from constants import SERVER_IDS
+from constants import SERVER_IDS, ROLE_IDS
 
 class SelfRoles(discord.ui.View):
     def __init__(self):
@@ -138,7 +138,7 @@ class onMsg(commands.Cog):
         if message.content.lower() == "mc!guilds":
             guild_list = "\n".join([f"- {g.name} (`{g.id}`)" for g in self.client.guilds])
             await message.channel.send(f"**Guilds I'm in:**\n{guild_list}")
-
+            
         if "mc!staff" in message.content and message.guild.id == SERVER_IDS["staff"]:
             from commands.Utility.staff import RefreshStaffView
             embed = discord.Embed(

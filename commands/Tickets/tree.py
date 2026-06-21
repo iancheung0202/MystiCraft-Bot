@@ -27,27 +27,6 @@ async def is_linked(user, client):
         print(f"Error fetching linked IGN for {user.id}: {e}")
         pass
 
-    # try:
-    #     main_guild = client.get_guild(SERVER_IDS["main"])
-    #     member = main_guild.get_member(user.id)
-    #     if member is None:
-    #         member = await main_guild.fetch_member(user.id)
-
-    #     if member is None:
-    #         return False, None
-
-    #     linked_role = main_guild.get_role(ROLE_IDS[SERVER_IDS["main"]]["linked"])
-    #     if linked_role not in member.roles:
-    #         return False, None
-
-    #     nickname = member.nick or member.display_name or ""
-    #     match = re.search(r"\[(.+?)\]$", nickname)
-    #     if match:
-    #         return True, match.group(1).strip()
-    # except Exception as e:
-    #     print(e)
-    #     pass
-
     return False, None
 
 class SupportActionButton(discord.ui.Button):
