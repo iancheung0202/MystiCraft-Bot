@@ -164,10 +164,10 @@ def create_loa_embed() -> discord.Embed:
         for rec in active_loas:
             lines.append(
                 f"{EMOJI_REDSTONE} <@{rec['user_id']}> — **{rec.get('reason', 'No reason')}**\n"
-                f"-# <:reply:1036792837821435976> {EMOJI_MC_CLOCK} <t:{rec['start']}:D> → <t:{rec['end']}:D>  •  back <t:{rec['end']}:R>"
+                f"-# <:reply:1036792837821435976> {EMOJI_MC_CLOCK} <t:{rec['start']}:D> → <t:{rec['end']}:D> *(back <t:{rec['end']}:R>)*"
             )
         embed.add_field(
-            name=f"{EMOJI_REDSTONE} Currently Away",
+            name=f"Currently Away",
             value="\n".join(lines) or "None",
             inline=False
         )
@@ -177,10 +177,10 @@ def create_loa_embed() -> discord.Embed:
         for rec in upcoming_loas:
             lines.append(
                 f"{EMOJI_GOLD_INGOT} <@{rec['user_id']}> — **{rec.get('reason', 'No reason')}**\n"
-                f"-# <:reply:1036792837821435976> {EMOJI_MC_CLOCK} <t:{rec['start']}:D> → <t:{rec['end']}:D>  •  starts <t:{rec['start']}:R>"
+                f"-# <:reply:1036792837821435976> {EMOJI_MC_CLOCK} <t:{rec['start']}:D> → <t:{rec['end']}:D> *(starts <t:{rec['start']}:R>)*"
             )
         embed.add_field(
-            name=f"{EMOJI_GOLD_INGOT} Heading Out Soon",
+            name=f"Heading Out Soon",
             value="\n".join(lines) or "None",
             inline=False
         )
@@ -188,7 +188,7 @@ def create_loa_embed() -> discord.Embed:
     if not active_loas and not upcoming_loas:
         embed.description = f"{EMOJI_EMERALD} The server is fully staffed. There are no active or upcoming LOAs right now."
 
-    embed.set_footer(text="📋 Use the buttons below to manage your LOA.")
+    embed.set_footer(text="Fill out the form below if you are planning to be away for 24 hours or more.")
     return embed
 
 
@@ -688,11 +688,11 @@ class LOAPanelView(discord.ui.View):
             ephemeral=True
         )
 
-    @discord.ui.button(label="Sync", style=discord.ButtonStyle.grey, custom_id="loa_sync", emoji=EMOJI_COMPASS, row=1)
+    @discord.ui.button(label="Sync", style=discord.ButtonStyle.grey, custom_id="loa_sync", emoji=EMOJI_COMPASS, row=0)
     async def sync(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=create_loa_embed(), view=self)
 
-    @discord.ui.button(label="Check User", style=discord.ButtonStyle.secondary, custom_id="loa_check", emoji=EMOJI_SPYGLASS, row=1)
+    @discord.ui.button(label="Check User", style=discord.ButtonStyle.secondary, custom_id="loa_check", emoji=EMOJI_SPYGLASS, row=0)
     async def check_user(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_manager(interaction.user):
             await interaction.response.send_message(embed=embed_error("Permission Denied", "Only Managers+ can check other users' LOA history."), ephemeral=True)
