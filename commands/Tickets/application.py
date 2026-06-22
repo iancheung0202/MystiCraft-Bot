@@ -416,7 +416,7 @@ class ApplicationView(discord.ui.View):
                     "What is your biggest weakness, and how do you work on it?",
                     "Explain what a good staff member is (50+ words).",
                     "Why do you want to become a staff member on MystiCraft, and how many hours per week can you dedicate?",
-                    "Before we submit your application, are there anything else you would like us to know?"
+                    "Before we submit your application, is there anything else you would like us to know?"
                 ]
             else:
                 requirements = (
@@ -438,7 +438,7 @@ class ApplicationView(discord.ui.View):
                     "How much time can you commit to creating and managing media content for the server on a weekly basis?",
                     "Estimate your average views per long and short form video uploaded, as well as your total amount of views.",
                     "What will you create content about? Do you have any content ideas in mind that you would like to share with us?",
-                    "Before we submit your application, are there anything else you would like us to know?",
+                    "Before we submit your application, is there anything else you would like us to know?",
                 ]
         elif interaction.guild.id == SERVER_IDS["tierlist"]:
             app_type = "staff" if is_staff else "tester"
@@ -471,7 +471,7 @@ class ApplicationView(discord.ui.View):
                     "What is your biggest weakness, and how do you work on it?",
                     "Explain what a good staff member is (50+ words).",
                     "How many hours per week can you dedicate on MystiTiers?",
-                    "Before we submit your application, are there anything else you would like us to know?"
+                    "Before we submit your application, is there anything else you would like us to know?"
                 ]
             else:
                 requirements = (
@@ -491,7 +491,7 @@ class ApplicationView(discord.ui.View):
                     "Which gamemodes do you wish to become a tester for? (You must be LT3 in the gamemode to qualify)",
                     "Why do you want to become a tester for MystiTiers?",
                     "How many hours per week can you dedicate on MystiTiers?",
-                    "Before we submit your application, are there anything else you would like us to know?",
+                    "Before we submit your application, is there anything else you would like us to know?",
                 ]
 
             if not any(tier in role.name for role in interaction.user.roles if "[" not in role.name and "]" not in role.name for tier in ["LT3", "HT3", "LT2", "HT2"]):

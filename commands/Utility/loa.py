@@ -13,38 +13,47 @@ from constants import ROLE_IDS, SERVER_IDS
 STAFF_SERVER_ROLES = [ROLE_IDS[SERVER_IDS["staff"]]["roles"][k] for k in ["owner", "manager", "senior_admin", "admin", "developer", "senior_mod", "mod", "helper"]]
 MANAGER_ROLES = [ROLE_IDS[SERVER_IDS["staff"]]["roles"]["owner"], ROLE_IDS[SERVER_IDS["staff"]]["roles"]["manager"]]
 
-# Timezone offsets (UTC-12 to UTC+14, whole hours)
 NEGATIVE_OFFSETS = [f"UTC{i}" for i in range(-12, 0)]
 POSITIVE_OFFSETS = [f"UTC+{i}" for i in range(0, 15)]  # includes UTC+0
 
 LOA_LOG_CHANNEL = 1517598730973609984
 APPROVAL_ROLE = 1165675275821002835
 
-# Embed colours
 COLOR_SUCCESS = 0x2ecc71
 COLOR_ERROR   = 0xe74c3c
 COLOR_INFO    = 0x1ec7f1
 COLOR_WARNING = 0xf1c40f
 
-# ----------------------------------------------------------------------
-# Embed helper functions
-# ----------------------------------------------------------------------
+EMOJI_EMERALD       = "<:emerald:1518031176730804244>" 
+EMOJI_REDSTONE      = "<:redstone_dust:1518031324588539986>"
+EMOJI_GOLD_INGOT    = "<:gold_ingot:1518031441248653433>"
+EMOJI_STEVE         = "<:steve:1518031537814110382>" 
+EMOJI_NETHER_STAR   = "<:nether_star:1518033504120606771>"
+EMOJI_COMPASS       = "<a:compass:1518032475803226214>" 
+EMOJI_ENDER_PEARL   = "<:ender_pearl:1518033866995269763>" 
+EMOJI_MC_CLOCK      = "<:mc_clock:1518027805361967104>" 
+EMOJI_MAP           = "<:map:1518038367521210499>" 
+EMOJI_BOOK          = "<:book:1518051136488214549>" 
+EMOJI_SCROLL        = "<:parchment:1518454271719510297>"
+EMOJI_FEATHER       = "<:feather:1518454349053952150>"
+EMOJI_BARRIER       = "<:barrier:1518454369887195228>"
+EMOJI_SPYGLASS      = "<:spyglass:1518454328480891083>"
+EMOJI_HOURGLASS     = "<:hourglass:1518454206162538546>"
+EMOJI_LOGO = "<:mysticraftlogo:1263811799237787789>"
+
 
 def embed_success(title: str, description: str = None) -> discord.Embed:
-    return discord.Embed(title=title, description=description, color=COLOR_SUCCESS)
+    return discord.Embed(title=f"{EMOJI_EMERALD} {title}", description=description, color=COLOR_SUCCESS)
 
 def embed_error(title: str, description: str = None) -> discord.Embed:
-    return discord.Embed(title=title, description=description, color=COLOR_ERROR)
+    return discord.Embed(title=f"{EMOJI_REDSTONE} {title}", description=description, color=COLOR_ERROR)
 
 def embed_info(title: str, description: str = None) -> discord.Embed:
-    return discord.Embed(title=title, description=description, color=COLOR_INFO)
+    return discord.Embed(title=f"{EMOJI_MAP} {title}", description=description, color=COLOR_INFO)
 
 def embed_warning(title: str, description: str = None) -> discord.Embed:
-    return discord.Embed(title=title, description=description, color=COLOR_WARNING)
+    return discord.Embed(title=f"{EMOJI_GOLD_INGOT} {title}", description=description, color=COLOR_WARNING)
 
-# ----------------------------------------------------------------------
-# Helper functions
-# ----------------------------------------------------------------------
 
 def is_staff(member: discord.Member) -> bool:
     if not member.guild:
@@ -111,7 +120,7 @@ def get_user_loa_history(user_id: int, start_ts: int = None, end_ts: int = None)
             "record_id": record_id,
             **rec
         })
-    return sorted(history, key=lambda x: x.get("start", 0))
+    return sorted(history, key=lambda x: x.get("start", 0), reverse=True)
 
 def format_date_plain(ts: int, offset_str: str = "UTC+0") -> str:
     """Return a plain date string (no Discord timestamp) for dropdown labels."""
@@ -139,11 +148,11 @@ def create_loa_embed() -> discord.Embed:
     """Create the embed for the LOA panel (active + upcoming)."""
     loas = get_active_loas()
     embed = discord.Embed(
-        title="📋 Staff Leave of Absence (LOA) Panel",
+        title=f"{EMOJI_BOOK} Staff Leave of Absence",
         color=COLOR_INFO
     )
     if not loas:
-        embed.description = "There are currently **no active or upcoming LOAs**."
+        embed.description = f"{EMOJI_EMERALD} The server is fully staffed. There are no active or upcoming LOAs right now."
         return embed
 
     now = int(time.time())
@@ -154,60 +163,137 @@ def create_loa_embed() -> discord.Embed:
         lines = []
         for rec in active_loas:
             lines.append(
-                f"<@{rec['user_id']}> – **{rec.get('reason', 'No reason')}**\n"
-                f"-# <t:{rec['start']}:D> → <t:{rec['end']}:D> (<t:{rec['end']}:R>)"
+                f"{EMOJI_REDSTONE} <@{rec['user_id']}> — **{rec.get('reason', 'No reason')}**\n"
+                f"-# <:reply:1036792837821435976> {EMOJI_MC_CLOCK} <t:{rec['start']}:D> → <t:{rec['end']}:D>  •  back <t:{rec['end']}:R>"
             )
-        embed.add_field(name="🟢 Active LOAs", value="\n".join(lines) or "None", inline=False)
+        embed.add_field(
+            name=f"{EMOJI_REDSTONE} Currently Away",
+            value="\n".join(lines) or "None",
+            inline=False
+        )
 
     if upcoming_loas:
         lines = []
         for rec in upcoming_loas:
             lines.append(
-                f"<@{rec['user_id']}> – **{rec.get('reason', 'No reason')}**\n"
-                f"-# <t:{rec['start']}:D> → <t:{rec['end']}:D> (<t:{rec['end']}:R>)"
+                f"{EMOJI_GOLD_INGOT} <@{rec['user_id']}> — **{rec.get('reason', 'No reason')}**\n"
+                f"-# <:reply:1036792837821435976> {EMOJI_MC_CLOCK} <t:{rec['start']}:D> → <t:{rec['end']}:D>  •  starts <t:{rec['start']}:R>"
             )
-        embed.add_field(name="⏳ Upcoming LOAs", value="\n".join(lines) or "None", inline=False)
+        embed.add_field(
+            name=f"{EMOJI_GOLD_INGOT} Heading Out Soon",
+            value="\n".join(lines) or "None",
+            inline=False
+        )
 
     if not active_loas and not upcoming_loas:
-        embed.description = "There are currently **no active or upcoming LOAs**."
+        embed.description = f"{EMOJI_EMERALD} The server is fully staffed. There are no active or upcoming LOAs right now."
 
-    embed.set_footer(text="Use the buttons below to manage LOAs.")
+    embed.set_footer(text="📋 Use the buttons below to manage your LOA.")
     return embed
 
-# ----------------------------------------------------------------------
-# Approval Log View
-# ----------------------------------------------------------------------
+
+def _make_meta_custom_id(record_id: str, old_record_id: str = None) -> str:
+    if old_record_id:
+        return f"loa_meta:{record_id}:{old_record_id}"
+    return f"loa_meta:{record_id}"
+
+def _parse_meta_button(message: discord.Message) -> tuple[str | None, bool, str | None]:
+    """
+    Find the data-carrier button in the message components and parse it.
+    Returns (record_id, is_edit, old_record_id).
+    """
+    for row in message.components:
+        for component in row.children:
+            if isinstance(component, discord.Button) and component.custom_id and component.custom_id.startswith("loa_meta:"):
+                parts = component.custom_id.split(":")
+                # parts[0] = "loa_meta", parts[1] = record_id, parts[2] = old_record_id (optional)
+                record_id = parts[1] if len(parts) > 1 else None
+                old_record_id = parts[2] if len(parts) > 2 else None
+                is_edit = old_record_id is not None
+                return record_id, is_edit, old_record_id
+    return None, False, None
+
+def _parse_user_id_from_embed(embed: discord.Embed) -> int | None:
+    """Extract user_id from the first <@id> mention in the embed description."""
+    if not embed or not embed.description:
+        return None
+    match = re.search(r"<@(\d+)>", embed.description)
+    return int(match.group(1)) if match else None
+
+
+class _MetaButton(discord.ui.Button):
+    """Invisible data-carrier button. Always disabled; custom_id holds LOA record info."""
+    def __init__(self, record_id: str, old_record_id: str = None):
+        super().__init__(
+            style=discord.ButtonStyle.secondary,
+            emoji=EMOJI_LOGO,
+            custom_id=_make_meta_custom_id(record_id, old_record_id),
+            disabled=True,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        pass  # never fires — button is permanently disabled
+
 
 class ApprovalView(discord.ui.View):
-    def __init__(self, record_id: str, user_id: int, is_edit: bool = False, old_record_id: str = None):
-        super().__init__(timeout=86400)  # 24 hours
-        self.record_id = record_id
-        self.user_id = user_id
-        self.is_edit = is_edit
-        self.old_record_id = old_record_id
+    """
+    Persistent approval view.
+    State is stored in the _MetaButton custom_id; user_id from the embed description.
+    Call ApprovalView(record_id) or ApprovalView(record_id, old_record_id) when sending.
+    """
 
-    @discord.ui.button(label="Approve", style=discord.ButtonStyle.success)
+    def __init__(self, record_id: str = None, old_record_id: str = None):
+        super().__init__(timeout=None)
+        if record_id is not None:
+            self.add_item(_MetaButton(record_id, old_record_id))
+
+    def _resolve(self, interaction: discord.Interaction):
+        """Return (user_id, record_id, is_edit, old_record_id) from the message."""
+        embed0 = interaction.message.embeds[0] if interaction.message.embeds else None
+        user_id = _parse_user_id_from_embed(embed0)
+        record_id, is_edit, old_record_id = _parse_meta_button(interaction.message)
+        return user_id, record_id, is_edit, old_record_id
+
+    @discord.ui.button(
+        label="Approve",
+        style=discord.ButtonStyle.gray,
+        emoji=EMOJI_EMERALD,
+        custom_id="loa_approve",
+    )
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_manager(interaction.user):
-            await interaction.response.send_message(embed=embed_error("Permission Denied", "You don't have permission to approve LOAs."), ephemeral=True)
+            await interaction.response.send_message(
+                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} Only Managers+ can approve LOAs."),
+                ephemeral=True,
+            )
+            return
+        
+        embed0 = interaction.message.embeds[0] if interaction.message.embeds else None
+
+        user_id, record_id, is_edit, old_record_id = self._resolve(interaction)
+        if not user_id or not record_id:
+            await interaction.response.send_message(
+                embed=embed_error("Parse Error", "Couldn't read request details from this message."),
+                ephemeral=True,
+            )
             return
 
-        ref = db.reference(f"LOA/{self.user_id}/{self.record_id}")
+        ref = db.reference(f"LOA/{user_id}/{record_id}")
         rec = ref.get()
         if not rec:
             await interaction.response.send_message(embed=embed_error("Not Found", "This LOA record no longer exists."), ephemeral=True)
             return
-
         if rec.get("status") != "pending":
-            await interaction.response.send_message(embed=embed_error("Invalid Status", f"This LOA is already **{rec.get('status')}**."), ephemeral=True)
+            await interaction.response.send_message(
+                embed=embed_error("Already Resolved", f"This LOA is already marked as **{rec.get('status')}**."),
+                ephemeral=True,
+            )
             return
 
-        # Handle edit requests
-        if self.is_edit and self.old_record_id:
-            old_ref = db.reference(f"LOA/{self.user_id}/{self.old_record_id}")
+        if is_edit and old_record_id:
+            old_ref = db.reference(f"LOA/{user_id}/{old_record_id}")
             old_rec = old_ref.get()
             if old_rec:
-                # Update old record with new data
                 old_ref.update({
                     "start": rec["start"],
                     "end": rec["end"],
@@ -215,158 +301,337 @@ class ApprovalView(discord.ui.View):
                     "reason": rec["reason"],
                     "additional": rec["additional"],
                     "status": "active",
-                    "updated_at": int(time.time())
+                    "updated_at": int(time.time()),
                 })
-                # Delete the pending edit record
                 ref.delete()
-                await interaction.response.edit_message(
-                    content=None,
-                    embed=embed_success("Edit Approved", f"Edit applied to <@{self.user_id}>'s LOA by <@{interaction.user.id}>."),
-                    view=None
+                result_embed = discord.Embed(
+                    title=f"{EMOJI_EMERALD} Edit Approved",
+                    description=(
+                        f"{EMOJI_FEATHER} The edit for <@{user_id}>'s LOA was approved by <@{interaction.user.id}>."
+                    ),
+                    color=COLOR_SUCCESS,
                 )
-                # Notify user
+                await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=None)
                 try:
-                    user = await interaction.client.fetch_user(self.user_id)
-                    if user:
-                        await user.send(embed=embed_success(
-                            "LOA Edit Approved",
-                            f"**New LOA:** {rec['reason']}\n"
-                            f"**From:** <t:{rec['start']}:D>\n"
-                            f"**To:** <t:{rec['end']}:D>"
-                        ))
-                except:
+                    user = await interaction.client.fetch_user(user_id)
+                    await user.send(embed=discord.Embed(
+                        title=f"{EMOJI_EMERALD} LOA Edit Approved",
+                        description=(
+                            f"Your edit request has been **approved**!\n\n"
+                            f"{EMOJI_BOOK} **Reason:** {rec['reason']}\n"
+                            f"{EMOJI_MC_CLOCK} **From:** <t:{rec['start']}:D>\n"
+                            f"{EMOJI_MC_CLOCK} **To:** <t:{rec['end']}:D>"
+                        ),
+                        color=COLOR_SUCCESS,
+                    ))
+                except Exception:
                     pass
                 return
-            else:
-                # Old record not found, fallback to normal approval
-                pass
 
-        # Handle replacement (new LOA that replaces an old one)
         replaces_id = rec.get("replaces")
-        if not self.is_edit and replaces_id:
-            # Deactivate the old LOA
-            old_ref = db.reference(f"LOA/{self.user_id}/{replaces_id}")
+        if not is_edit and replaces_id:
+            old_ref = db.reference(f"LOA/{user_id}/{replaces_id}")
             old_rec = old_ref.get()
             if old_rec and old_rec.get("status") == "active":
                 old_ref.update({
                     "status": "replaced",
-                    "replaced_by": self.record_id,
-                    "replaced_at": int(time.time())
+                    "replaced_by": record_id,
+                    "replaced_at": int(time.time()),
                 })
-                # Optionally adjust end date to new start - 1 day? Not necessary, but we mark as replaced.
 
-        # Normal approval (new LOA or edit fallback)
         ref.update({
             "status": "active",
             "approved_by": interaction.user.id,
-            "approved_at": int(time.time())
+            "approved_at": int(time.time()),
         })
-        await interaction.response.edit_message(
-            content=None,
-            embed=embed_success("LOA Approved", f"LOA for <@{self.user_id}> has been **approved** by <@{interaction.user.id}>."),
-            view=None
+        result_embed = discord.Embed(
+            title=f"{EMOJI_EMERALD} LOA Approved",
+            description=(
+                f"{EMOJI_STEVE} <@{user_id}>'s LOA was approved by <@{interaction.user.id}>."
+                + (f"\n{EMOJI_ENDER_PEARL} *Previous LOA has been replaced.*" if replaces_id else "")
+            ),
+            color=COLOR_SUCCESS,
         )
-        # Notify user
+        await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=None)
         try:
-            user = await interaction.client.fetch_user(self.user_id)
-            if user:
-                msg = f"**LOA:** {rec['reason']}\n**From:** <t:{rec['start']}:D>\n**To:** <t:{rec['end']}:D>"
-                if replaces_id:
-                    msg += "\n*Your previous LOA has been replaced.*"
-                await user.send(embed=embed_success("LOA Approved", msg))
-        except:
+            user = await interaction.client.fetch_user(user_id)
+            msg = (
+                f"Your LOA request has been **approved**! You may log off and rest up during this time. ⛏️\n\n"
+                f"{EMOJI_BOOK} **Reason:** {rec['reason']}\n"
+                f"{EMOJI_MC_CLOCK} **From:** <t:{rec['start']}:D>\n"
+                f"{EMOJI_MC_CLOCK} **To:** <t:{rec['end']}:D>"
+            )
+            if replaces_id:
+                msg += f"\n{EMOJI_ENDER_PEARL} *Your previous LOA has been replaced.*"
+            await user.send(embed=discord.Embed(
+                title=f"{EMOJI_EMERALD} LOA Approved",
+                description=msg,
+                color=COLOR_SUCCESS,
+            ))
+        except Exception:
             pass
 
-    @discord.ui.button(label="Reject", style=discord.ButtonStyle.danger)
+    @discord.ui.button(
+        label="Reject",
+        style=discord.ButtonStyle.gray,
+        emoji=EMOJI_REDSTONE,
+        custom_id="loa_reject",
+    )
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_manager(interaction.user):
-            await interaction.response.send_message(embed=embed_error("Permission Denied", "You don't have permission to reject LOAs."), ephemeral=True)
+            await interaction.response.send_message(
+                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} Only Managers+ can reject LOAs."),
+                ephemeral=True,
+            )
             return
 
-        ref = db.reference(f"LOA/{self.user_id}/{self.record_id}")
+        embed0 = interaction.message.embeds[0] if interaction.message.embeds else None
+        user_id, record_id, is_edit, old_record_id = self._resolve(interaction)
+        if not user_id or not record_id:
+            await interaction.response.send_message(
+                embed=embed_error("Parse Error", "Couldn't read request details from this message."),
+                ephemeral=True,
+            )
+            return
+
+        ref = db.reference(f"LOA/{user_id}/{record_id}")
         rec = ref.get()
         if not rec:
             await interaction.response.send_message(embed=embed_error("Not Found", "This LOA record no longer exists."), ephemeral=True)
             return
-
         if rec.get("status") != "pending":
-            await interaction.response.send_message(embed=embed_error("Invalid Status", f"This LOA is already **{rec.get('status')}**."), ephemeral=True)
+            await interaction.response.send_message(
+                embed=embed_error("Already Resolved", f"This LOA is already marked as **{rec.get('status')}**."),
+                ephemeral=True,
+            )
             return
 
-        if self.is_edit and self.old_record_id:
-            # Just delete the pending edit request
+        if is_edit and old_record_id:
             ref.delete()
-            await interaction.response.edit_message(
-                content=None,
-                embed=embed_error("Edit Rejected", f"Edit request for <@{self.user_id}> has been **rejected** and removed by <@{interaction.user.id}>."),
-                view=None
+            result_embed = discord.Embed(
+                title=f"{EMOJI_REDSTONE} Edit Rejected",
+                description=(
+                    f"{EMOJI_FEATHER} The edit request for <@{user_id}> was **rejected** by <@{interaction.user.id}>. "
+                    f"The original LOA remains unchanged."
+                ),
+                color=COLOR_ERROR,
             )
+            await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=None)
             try:
-                user = await interaction.client.fetch_user(self.user_id)
-                if user:
-                    await user.send(embed=embed_error("LOA Edit Rejected", f"Your request to edit your LOA has been **rejected** by <@{interaction.user.id}>. If you go inactive during this time, it may affect your staff rank in the future"))
-            except:
+                user = await interaction.client.fetch_user(user_id)
+                await user.send(embed=discord.Embed(
+                    title=f"{EMOJI_REDSTONE} LOA Edit Rejected",
+                    description=(
+                        f"Your request to edit your LOA was **rejected** by <@{interaction.user.id}>.\n"
+                        f"Your original LOA remains active. If you go inactive during this period it may affect your staff rank."
+                    ),
+                    color=COLOR_ERROR,
+                ))
+            except Exception:
                 pass
             return
 
         ref.update({
             "status": "rejected",
             "rejected_by": interaction.user.id,
-            "rejected_at": int(time.time())
+            "rejected_at": int(time.time()),
         })
-        await interaction.response.edit_message(
-            content=None,
-            embed=embed_error("LOA Rejected", f"LOA for <@{self.user_id}> has been **rejected** by <@{interaction.user.id}>. If you go inactive during this time, it may affect your staff rank in the future"),
-            view=None
+        result_embed = discord.Embed(
+            title=f"{EMOJI_REDSTONE} LOA Rejected",
+            description=(
+                f"{EMOJI_STEVE} <@{user_id}>'s LOA was **rejected** by <@{interaction.user.id}>."
+            ),
+            color=COLOR_ERROR,
         )
+        await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=None)
         try:
-            user = await interaction.client.fetch_user(self.user_id)
-            if user:
-                await user.send(embed=embed_error(
-                    "LOA Rejected",
-                    f"**LOA:** {rec['reason']}\n"
-                    f"**From:** <t:{rec['start']}:D>\n"
-                    f"**To:** <t:{rec['end']}:D>"
-                ))
-        except:
+            user = await interaction.client.fetch_user(user_id)
+            await user.send(embed=discord.Embed(
+                title=f"{EMOJI_REDSTONE} LOA Rejected",
+                description=(
+                    f"Your LOA request was **rejected**. If you go inactive during this period it may affect your staff rank.\n\n"
+                    f"{EMOJI_BOOK} **Reason:** {rec['reason']}\n"
+                    f"{EMOJI_MC_CLOCK} **From:** <t:{rec['start']}:D>\n"
+                    f"{EMOJI_MC_CLOCK} **To:** <t:{rec['end']}:D>\n\n"
+                    f"If you believe this is a mistake, please reach out to your Mentor."
+                ),
+                color=COLOR_ERROR,
+            ))
+        except Exception:
             pass
 
-    @discord.ui.button(label="View History", style=discord.ButtonStyle.secondary, emoji="📜")
+    @discord.ui.button(
+        label="History",
+        style=discord.ButtonStyle.secondary,
+        emoji=EMOJI_BOOK,
+        custom_id="loa_history",
+    )
     async def view_history(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_manager(interaction.user):
-            await interaction.response.send_message(embed=embed_error("Permission Denied", "You don't have permission to view this."), ephemeral=True)
-            return
-
-        history = get_user_loa_history(self.user_id)
-        if not history:
-            await interaction.response.send_message(embed=embed_info("History", f"No LOA history found for <@{self.user_id}>."), ephemeral=True)
-            return
-
-        lines = []
-        for rec in history:
-            status = rec.get("status", "unknown")
-            emoji = "🟢" if status == "active" else "⏳" if status == "pending" else "🔴" if status == "rejected" else "⚪" if status == "replaced" else "⚪"
-            lines.append(
-                f"{emoji} **{rec['reason']}** ({status})\n"
-                f"-# <t:{rec['start']}:D> → <t:{rec['end']}:D>"
+            await interaction.response.send_message(
+                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} Only Managers+ can view LOA history."),
+                ephemeral=True,
             )
-        embed = discord.Embed(
-            title=f"📜 LOA History for {interaction.client.get_user(self.user_id)}",
-            description="\n".join(lines),
-            color=COLOR_INFO
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
 
-# ----------------------------------------------------------------------
-# Views for the LOA Panel
-# ----------------------------------------------------------------------
+        embed0 = interaction.message.embeds[0] if interaction.message.embeds else None
+        user_id, _, _, _ = self._resolve(interaction)
+        if not user_id:
+            await interaction.response.send_message(
+                embed=embed_error("Parse Error", "Couldn't determine the user from this message."),
+                ephemeral=True,
+            )
+            return
+
+        history = get_user_loa_history(user_id)
+        if not history:
+            await interaction.response.send_message(
+                embed=embed_info("No Records", f"No LOA history on file for <@{user_id}>."),
+                ephemeral=True,
+            )
+            return
+
+        pages = _build_history_pages(user_id, history)
+        await interaction.response.send_message(
+            embed=pages[0],
+            view=HistoryPageView(pages),
+            ephemeral=True,
+        )
+
+
+def _status_row(rec: dict) -> tuple[str, str]:
+    """Return (emoji, label) for a record based on its stored status and timing."""
+    now = int(time.time())
+    status = rec.get("status", "unknown")
+    if status == "active":
+        if rec.get("start", 0) > now:
+            return EMOJI_GOLD_INGOT, "Upcoming"
+        elif rec.get("end", 0) >= now:
+            return EMOJI_EMERALD, "Active"
+        else:
+            return EMOJI_COMPASS, "Ended"
+    elif status == "pending":
+        return EMOJI_GOLD_INGOT, "Pending"
+    elif status == "rejected":
+        return EMOJI_REDSTONE, "Rejected"
+    elif status == "replaced":
+        return EMOJI_ENDER_PEARL, "Replaced"
+    else:
+        return EMOJI_NETHER_STAR, status.title()
+
+
+_RECORDS_PER_PAGE = 5
+
+def _build_history_pages(user_id: int, history: list[dict], title_suffix: str = "") -> list[discord.Embed]:
+    """
+    Build a paginated list of history embeds (newest-first, _RECORDS_PER_PAGE per page).
+    The summary line appears on every page for quick reference.
+    """
+    STATUS_COLORS = {
+        "active":   COLOR_SUCCESS,
+        "pending":  COLOR_WARNING,
+        "rejected": COLOR_ERROR,
+        "replaced": COLOR_INFO,
+    }
+
+    # Summary counts (across all records)
+    counts: dict[str, int] = {}
+    for rec in history:
+        s = rec.get("status", "unknown")
+        counts[s] = counts.get(s, 0) + 1
+
+    summary_parts = []
+    if counts.get("active"):
+        summary_parts.append(f"{EMOJI_EMERALD} {counts['active']} active")
+    if counts.get("pending"):
+        summary_parts.append(f"{EMOJI_GOLD_INGOT} {counts['pending']} pending")
+    if counts.get("rejected"):
+        summary_parts.append(f"{EMOJI_REDSTONE} {counts['rejected']} rejected")
+    if counts.get("replaced"):
+        summary_parts.append(f"{EMOJI_ENDER_PEARL} {counts['replaced']} replaced")
+    summary_line = "  •  ".join(summary_parts) if summary_parts else "No records"
+
+    # Build one text block per record
+    record_lines: list[str] = []
+    for rec in history:
+        emoji, label = _status_row(rec)
+        duration_days = max(1, (rec.get("end", rec.get("start", 0)) - rec.get("start", 0)) // 86400 + 1)
+        day_word = "day" if duration_days == 1 else "days"
+        additional = rec.get("additional", "").strip()
+        line = (
+            f"{emoji} **{rec.get('reason', 'No reason')}** — *{label}*\n"
+            f"-# <:reply:1036792837821435976> {EMOJI_MC_CLOCK} <t:{rec['start']}:D> → <t:{rec['end']}:D>  "
+            f"({duration_days} {day_word})"
+        )
+        if additional:
+            line += f"\n-# {EMOJI_BOOK} {additional}"
+        record_lines.append(line)
+
+    # Chunk into pages
+    chunks = [record_lines[i:i + _RECORDS_PER_PAGE] for i in range(0, len(record_lines), _RECORDS_PER_PAGE)]
+    total_pages = len(chunks)
+    # Pick embed colour from the most recent (index 0) record
+    embed_color = STATUS_COLORS.get(history[0].get("status", "active"), COLOR_INFO)
+
+    pages: list[discord.Embed] = []
+    for page_idx, chunk in enumerate(chunks):
+        header = (
+            f"-# <@{user_id}>  •  {len(history)} record{'s' if len(history) != 1 else ''}  •  "
+            f"newest first\n{summary_line}\n"
+        )
+        embed = discord.Embed(
+            title=f"{EMOJI_BOOK} LOA History{title_suffix}",
+            description=header + "\n" + "\n\n".join(chunk),
+            color=embed_color,
+        )
+        embed.set_footer(text=f"Page {page_idx + 1} of {total_pages}  •  Records sorted newest → oldest")
+        pages.append(embed)
+
+    return pages
+
+
+class HistoryPageView(discord.ui.View):
+    """Pagination view for LOA history embeds."""
+
+    def __init__(self, pages: list[discord.Embed]):
+        super().__init__(timeout=180)
+        self.pages = pages
+        self.page = 0
+        # Disable nav buttons when there's only one page
+        if len(pages) <= 1:
+            for item in self.children:
+                item.disabled = True
+
+    def _current_embed(self) -> discord.Embed:
+        return self.pages[self.page]
+
+    @discord.ui.button(style=discord.ButtonStyle.grey, emoji="<:fastbackward:1351972112696479824>")
+    async def super_prev(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page = 0
+        await interaction.response.edit_message(embed=self._current_embed(), view=self)
+
+    @discord.ui.button(style=discord.ButtonStyle.grey, emoji="<:backarrow:1351972111010369618>")
+    async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page = (self.page - 1) % len(self.pages)
+        await interaction.response.edit_message(embed=self._current_embed(), view=self)
+
+    @discord.ui.button(style=discord.ButtonStyle.grey, emoji="<:rightarrow:1351972116819480616>")
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page = (self.page + 1) % len(self.pages)
+        await interaction.response.edit_message(embed=self._current_embed(), view=self)
+
+    @discord.ui.button(style=discord.ButtonStyle.grey, emoji="<:fastforward:1351972114433048719>")
+    async def super_next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page = len(self.pages) - 1
+        await interaction.response.edit_message(embed=self._current_embed(), view=self)
+
 
 class LOAPanelView(discord.ui.View):
     """Persistent view for the LOA management panel."""
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Submit LOA", style=discord.ButtonStyle.primary, custom_id="loa_submit", emoji="📝", row=0)
+    @discord.ui.button(label="Request LOA", style=discord.ButtonStyle.primary, custom_id="loa_submit", emoji=EMOJI_SCROLL, row=0)
     async def submit_loa(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_staff(interaction.user):
             await interaction.response.send_message(embed=embed_error("Access Denied", "You are not a staff member."), ephemeral=True)
@@ -380,8 +645,9 @@ class LOAPanelView(discord.ui.View):
             view = ReplaceOrNewView(interaction.user.id, existing)
             await interaction.response.send_message(
                 embed=embed_warning(
-                    "Existing LOA Detected",
-                    "You already have an active or upcoming LOA. Would you like to **replace** it or **add a new separate LOA**?"
+                    "You've Already Got One!",
+                    f"{EMOJI_ENDER_PEARL} You already have an active or upcoming LOA.\n"
+                    "Want to **replace it** with a new one, or **add a separate LOA** on top?"
                 ),
                 view=view,
                 ephemeral=True
@@ -390,15 +656,15 @@ class LOAPanelView(discord.ui.View):
             view = DateRangeSelectView(interaction.user.id)
             await interaction.response.send_message(
                 embed=embed_info(
-                    "Select Dates",
-                    "Please select the **start** and **end** dates of your LOA.\n"
-                    "These dates are based on your local calendar. You will choose your timezone next to define the exact day boundaries."
+                    "Pick Your Dates",
+                    f"{EMOJI_MC_CLOCK} Select the **start** and **end** dates of your LOA. "
+                    "Please choose based on **your local calendar**. You'll pick your timezone next."
                 ),
                 view=view,
                 ephemeral=True
             )
 
-    @discord.ui.button(label="Edit LOA", style=discord.ButtonStyle.blurple, custom_id="loa_edit", emoji="✏️", row=0)
+    @discord.ui.button(label="Edit LOA", style=discord.ButtonStyle.blurple, custom_id="loa_edit", emoji=EMOJI_FEATHER, row=0)
     async def edit_loa(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_staff(interaction.user):
             await interaction.response.send_message(embed=embed_error("Access Denied", "You are not a staff member."), ephemeral=True)
@@ -413,19 +679,30 @@ class LOAPanelView(discord.ui.View):
             return
 
         view = EditLOASelectView(interaction.user.id, editable)
-        await interaction.response.send_message(embed=embed_info("Select LOA to Edit", "Choose the LOA you want to edit:"), view=view, ephemeral=True)
+        await interaction.response.send_message(
+            embed=embed_info(
+                "Select LOA to Edit",
+                f"{EMOJI_FEATHER} Choose the LOA you want to edit:"
+            ),
+            view=view,
+            ephemeral=True
+        )
 
-    @discord.ui.button(label="Sync", style=discord.ButtonStyle.grey, custom_id="loa_sync", emoji="<:refresh:1048779043287351408>", row=1)
+    @discord.ui.button(label="Sync", style=discord.ButtonStyle.grey, custom_id="loa_sync", emoji=EMOJI_COMPASS, row=1)
     async def sync(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=create_loa_embed(), view=self)
 
-    @discord.ui.button(label="Check User", style=discord.ButtonStyle.secondary, custom_id="loa_check", emoji="🔍", row=1)
+    @discord.ui.button(label="Check User", style=discord.ButtonStyle.secondary, custom_id="loa_check", emoji=EMOJI_SPYGLASS, row=1)
     async def check_user(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not is_manager(interaction.user):
             await interaction.response.send_message(embed=embed_error("Permission Denied", "Only Managers+ can check other users' LOA history."), ephemeral=True)
             return
         view = UserSelectView()
-        await interaction.response.send_message(embed=embed_info("Select User", "Select a user to view their LOA history:"), view=view, ephemeral=True)
+        await interaction.response.send_message(
+            embed=embed_info("Lookup Player", f"{EMOJI_SPYGLASS} Select a staff member to pull up their LOA records:"),
+            view=view,
+            ephemeral=True
+        )
 
 
 class EditLOASelectView(discord.ui.View):
@@ -446,7 +723,7 @@ class EditLOASelectView(discord.ui.View):
 
 class EditLOASelect(discord.ui.Select):
     def __init__(self, options, parent_view):
-        super().__init__(placeholder="Choose a LOA to edit", options=options[:25])
+        super().__init__(placeholder=f"Choose which LOA to edit...", options=options[:25])
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
@@ -470,7 +747,7 @@ class EditLOAModal(discord.ui.Modal):
         self.start_date = discord.ui.TextInput(
             label="New Start Date (YYYY-MM-DD)",
             placeholder="e.g., 2026-07-01",
-            default=datetime.datetime.fromtimestamp(current_data['start']).strftime("%Y-%m-%d"),
+            default=format_date_plain(current_data['start'], current_data.get('timezone_offset', 'UTC+0')),
             required=True
         )
         self.add_item(self.start_date)
@@ -478,7 +755,7 @@ class EditLOAModal(discord.ui.Modal):
         self.end_date = discord.ui.TextInput(
             label="New End Date (YYYY-MM-DD)",
             placeholder="e.g., 2026-07-05",
-            default=datetime.datetime.fromtimestamp(current_data['end']).strftime("%Y-%m-%d"),
+            default=format_date_plain(current_data['end'], current_data.get('timezone_offset', 'UTC+0')),
             required=True
         )
         self.add_item(self.end_date)
@@ -543,24 +820,24 @@ class EditLOAModal(discord.ui.Modal):
         log_channel = interaction.guild.get_channel(LOA_LOG_CHANNEL)
         if log_channel:
             embed = discord.Embed(
-                title="✏️ LOA Edit Request",
-                description=f"<@{self.user_id}> has requested to edit their LOA.",
+                title=f"{EMOJI_FEATHER} LOA Edit Request",
+                description=f"{EMOJI_STEVE} <@{self.user_id}> wants to update their LOA details.",
                 color=COLOR_WARNING,
             )
             embed.add_field(
-                name="Original LOA",
-                value=f"**{self.current_data.get('reason', 'No reason')}**\n<t:{self.current_data['start']}:D> → <t:{self.current_data['end']}:D>",
+                name=f"{EMOJI_REDSTONE} Original LOA",
+                value=f"> **{self.current_data.get('reason', 'No reason')}**\n-# <:reply:1036792837821435976> {EMOJI_MC_CLOCK} <t:{self.current_data['start']}:D> → <t:{self.current_data['end']}:D>",
                 inline=False
             )
             embed.add_field(
-                name="New LOA",
-                value=f"**{self.reason.value}**\n<t:{start_ts}:D> → <t:{end_ts}:D>",
+                name=f"{EMOJI_EMERALD} Requested Changes",
+                value=f"> **{self.reason.value}**\n-# <:reply:1036792837821435976> {EMOJI_MC_CLOCK} <t:{start_ts}:D> → <t:{end_ts}:D>",
                 inline=False
             )
-            embed.add_field(name="Additional Info", value=self.additional.value or "None", inline=False)
-            embed.set_footer(text=f"User ID: {self.user_id} | Record ID: {new_record_id}")
+            if self.additional.value:
+                embed.add_field(name=f"{EMOJI_FEATHER} Additional Info", value=self.additional.value, inline=False)
 
-            view = ApprovalView(new_record_id, self.user_id, is_edit=True, old_record_id=self.record_id)
+            view = ApprovalView(new_record_id, self.record_id)
             await log_channel.send(f"<@&{APPROVAL_ROLE}>", embed=embed, view=view)
 
         await interaction.response.send_message(
@@ -589,7 +866,7 @@ class ReplaceOrNewView(discord.ui.View):
 
 class ReplaceSelect(discord.ui.Select):
     def __init__(self, options, parent_view):
-        super().__init__(placeholder="Choose LOA to replace", options=options[:25])
+        super().__init__(placeholder=f"{EMOJI_ENDER_PEARL} Choose LOA to replace...", options=options[:25])
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
@@ -597,7 +874,10 @@ class ReplaceSelect(discord.ui.Select):
         self.parent_view.replace_record_id = record_id
         view = DateRangeSelectView(self.parent_view.user_id, replace_record_id=record_id)
         await interaction.response.edit_message(
-            embed=embed_info("Select New Dates", "Please select the new **start** and **end** dates for your replacement LOA."),
+            embed=embed_info(
+                "Pick New Dates",
+                f"{EMOJI_ENDER_PEARL} Select the new **start** and **end** dates for your replacement LOA."
+            ),
             view=view
         )
 
@@ -645,17 +925,17 @@ class DateRangeSelectView(discord.ui.View):
         self.add_item(CancelButton(row=4))
 
     def get_embed(self) -> discord.Embed:
-        embed = discord.Embed(
-            title="📅 Select Dates",
-            color=COLOR_INFO
+        embed = embed_info("Pick Your Dates", "").set_footer(text="Start and end can be the same day for a 1-day LOA.")
+        desc = (
+            f"{EMOJI_MC_CLOCK} Select the **start** (green) and **end** (red) dates for your LOA. "
+            "Please choose based on **your local calendar**. You'll pick your timezone next.\n\n"
         )
-        desc = "Choose the **start** (green) and **end** (red) dates for your LOA.\n"
         if self.start_date:
-            desc += f"**Start:** {self.start_date.strftime('%Y-%m-%d')}\n"
+            desc += f"-# **Start:** {self.start_date.strftime('%Y-%m-%d')}\n"
         if self.end_date:
-            desc += f"**End:** {self.end_date.strftime('%Y-%m-%d')}\n"
+            desc += f"-# **End:** {self.end_date.strftime('%Y-%m-%d')}\n"
             duration = (self.end_date - self.start_date).days + 1
-            desc += f"**Duration:** {duration} day{'s' if duration != 1 else ''}\n"
+            desc += f"-# **Duration:** {duration} day{'s' if duration != 1 else ''}\n"
         embed.description = desc
         return embed
 
@@ -714,7 +994,7 @@ class StatusLabel(discord.ui.Button):
 
 class ConfirmDatesButton(discord.ui.Button):
     def __init__(self, parent_view, row):
-        super().__init__(label="Confirm Dates", style=discord.ButtonStyle.success, row=row)
+        super().__init__(label="Confirm Dates", style=discord.ButtonStyle.success, row=row, emoji=EMOJI_MC_CLOCK)
         self.parent_view = parent_view
 
     async def callback(self, interaction: discord.Interaction):
@@ -730,11 +1010,10 @@ class ConfirmDatesButton(discord.ui.Button):
         )
         await interaction.response.edit_message(
             embed=embed_info(
-                "Select Timezone",
-                "Now, choose your **timezone offset**.\n"
-                "This offset defines the **day boundaries** (midnight to midnight) for your LOA.\n"
-                "All dates shown in the panel will automatically appear in your own local timezone – you only need this to tell the system where your calendar day starts/ends.\n"
-                "Select an offset from one of the dropdowns below."
+                "Set Your Timezone",
+                f"{EMOJI_MC_CLOCK} Pick your **closest timezone** from one of the dropdowns. "
+                "This defines where your calendar day starts and ends (midnight to midnight). "
+                "Dates shown in the panel will auto-convert to everyone's own local time.\n"
             ),
             view=view
         )
@@ -746,13 +1025,10 @@ class CancelButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.edit_message(
-            embed=embed_info("Cancelled", "LOA submission cancelled."),
+            embed=embed_error("Cancelled", "LOA submission successfully cancelled."),
             view=None
         )
 
-# ----------------------------------------------------------------------
-# Timezone selection
-# ----------------------------------------------------------------------
 
 class TimezoneSelectView(discord.ui.View):
     def __init__(self, start_date, end_date, user_id, offset=0, replace_record_id=None):
@@ -804,12 +1080,14 @@ class TimezoneSelectNegative(discord.ui.Select):
 
         self.parent_view.update_selection(offset)
         embed = discord.Embed(
-            title="Timezone Selected",
-            description=f"✅ Selected timezone: **{offset}** (current time there: **{time_str}**).\n\n"
-                        f"Your LOA will be recorded from **<t:{start_ts}:D>** to **<t:{end_ts}:D>**.\n"
-                        f"(These dates will appear in **your own local timezone** when viewed in the panel.)\n\n"
-                        f"Please confirm by clicking **Next**.",
-            color=COLOR_INFO
+            title=f"{EMOJI_MC_CLOCK} Timezone Set",
+            description=(
+                f"{EMOJI_EMERALD} Locked in: **{offset}** (your local time right now: **{time_str}**)\n\n"
+                f"Your LOA will run from **<t:{start_ts}:D>** to **<t:{end_ts}:D>**.\n"
+                f"-# Dates display in everyone's local timezone in the panel.\n\n"
+                f"Click **Next** to fill in the details, or **Back** to change your dates."
+            ),
+            color=COLOR_INFO,
         )
         await interaction.response.edit_message(embed=embed, view=self.parent_view)
 
@@ -838,12 +1116,14 @@ class TimezoneSelectPositive(discord.ui.Select):
 
         self.parent_view.update_selection(offset)
         embed = discord.Embed(
-            title="Timezone Selected",
-            description=f"✅ Selected timezone: **{offset}** (current time there: **{time_str}**).\n\n"
-                        f"Your LOA will be recorded from **<t:{start_ts}:D>** to **<t:{end_ts}:D>**.\n"
-                        f"(These dates will appear in **your own local timezone** when viewed in the panel.)\n\n"
-                        f"Please confirm by clicking **Next**.",
-            color=COLOR_INFO
+            title=f"{EMOJI_MC_CLOCK} Timezone Set",
+            description=(
+                f"{EMOJI_EMERALD} Locked in: **{offset}** (your local time right now: **{time_str}**)\n\n"
+                f"Your LOA will run from **<t:{start_ts}:D>** to **<t:{end_ts}:D>**.\n"
+                f"-# Dates display in everyone's local timezone in the panel.\n\n"
+                f"Click **Next** to fill in the details, or **Back** to change your dates."
+            ),
+            color=COLOR_INFO,
         )
         await interaction.response.edit_message(embed=embed, view=self.parent_view)
 
@@ -880,18 +1160,8 @@ class BackToDateButton(discord.ui.Button):
             end_date=self.parent_view.end_date,
             replace_record_id=self.parent_view.replace_record_id
         )
-        await interaction.response.edit_message(
-            embed=embed_info(
-                "Select Dates",
-                "Please select the **start** and **end** dates of your LOA.\n"
-                "These dates are based on your local calendar. You will choose your timezone next to define the exact day boundaries."
-            ),
-            view=view
-        )
+        await interaction.response.edit_message(embed=view.get_embed(), view=view)
 
-# ----------------------------------------------------------------------
-# LOA Modal
-# ----------------------------------------------------------------------
 
 class LOAModal(discord.ui.Modal):
     def __init__(self, start_date, end_date, tz_offset, user_id, replace_record_id=None):
@@ -914,7 +1184,7 @@ class LOAModal(discord.ui.Modal):
         self.additional = discord.ui.TextInput(
             label="Additional Info (optional)",
             style=discord.TextStyle.paragraph,
-            placeholder="Any extra details...",
+            placeholder="Any extra details before sending off",
             required=False,
             max_length=500
         )
@@ -937,7 +1207,7 @@ class LOAModal(discord.ui.Modal):
         duration_days = (self.end_date - self.start_date).days + 1
         warning = ""
         if duration_days > 7:
-            warning = "\n⚠️ **Note:** This LOA exceeds 7 days, which may require additional approval steps."
+            warning = f"\n{EMOJI_GOLD_INGOT} **Note:** This LOA is longer than 7 days. Your Mentor may reach out for more details before it's approved."
 
         record = {
             "start": start_ts,
@@ -958,34 +1228,33 @@ class LOAModal(discord.ui.Modal):
         log_channel = interaction.guild.get_channel(LOA_LOG_CHANNEL)
         if log_channel:
             embed = discord.Embed(
-                title="📋 New LOA Request",
-                description=f"<@{self.user_id}> has submitted a new LOA request.",
+                title=f"{EMOJI_SCROLL} New LOA Request",
+                description=f"{EMOJI_STEVE} <@{self.user_id}> is heading out and needs some time away.",
                 color=COLOR_WARNING,
             )
-            embed.add_field(name="Reason", value=self.reason.value, inline=False)
-            embed.add_field(name="Start Date", value=f"<t:{start_ts}:D>", inline=True)
-            embed.add_field(name="End Date", value=f"<t:{end_ts}:D>", inline=True)
-            embed.add_field(name="Duration", value=f"{duration_days} day{'s' if duration_days != 1 else ''}", inline=True)
-            embed.add_field(name="Timezone Offset", value=self.tz_offset, inline=True)
-            embed.add_field(name="Additional Info", value=self.additional.value or "None", inline=False)
+            embed.add_field(name=f"{EMOJI_BOOK} Reason", value=self.reason.value, inline=False)
+            embed.add_field(name=f"{EMOJI_MC_CLOCK} Start Date", value=f"<t:{start_ts}:D>", inline=True)
+            embed.add_field(name=f"{EMOJI_MC_CLOCK} End Date", value=f"<t:{end_ts}:D>", inline=True)
+            embed.add_field(name=f"{EMOJI_HOURGLASS} Duration", value=f"{duration_days} day{'s' if duration_days != 1 else ''}", inline=True)
+            embed.add_field(name=f"{EMOJI_COMPASS} Timezone", value=self.tz_offset, inline=True)
+            if self.additional.value:
+                embed.add_field(name=f"{EMOJI_FEATHER} Additional Info", value=self.additional.value, inline=False)
             if self.replace_record_id:
-                embed.add_field(name="Replaces", value=f"<t:{self.replace_record_id}> (old LOA ID)", inline=False)
-            embed.set_footer(text=f"User ID: {self.user_id} | Record ID: {record_id}")
+                embed.add_field(name=f"{EMOJI_ENDER_PEARL} Replaces", value=f"Record `{self.replace_record_id}` (previous LOA)", inline=False)
+            # embed.set_footer(text=f"Record ID: {record_id}")
 
-            view = ApprovalView(record_id, self.user_id, is_edit=False)
+            view = ApprovalView(record_id)
             await log_channel.send(f"<@&{APPROVAL_ROLE}>", embed=embed, view=view)
 
         await interaction.response.send_message(
             embed=embed_success(
                 "LOA Submitted",
-                f"Your LOA request has been submitted for approval. You will be notified once it is reviewed.{warning}"
+                f"Your leave request is in! A manager will review it shortly. {EMOJI_COMPASS}\n"
+                f"You'll get a DM once it's approved or rejected.{warning}"
             ),
             ephemeral=True
         )
 
-# ----------------------------------------------------------------------
-# User history check
-# ----------------------------------------------------------------------
 
 class UserSelectView(discord.ui.View):
     def __init__(self):
@@ -994,13 +1263,17 @@ class UserSelectView(discord.ui.View):
 
 class UserSelectDropdown(discord.ui.UserSelect):
     def __init__(self):
-        super().__init__(placeholder="Select a staff member", min_values=1, max_values=1)
+        super().__init__(placeholder=f"Choose a staff member to look up...", min_values=1, max_values=1)
 
     async def callback(self, interaction: discord.Interaction):
         user = self.values[0]
         view = HistoryRangeView(user)
         await interaction.response.edit_message(
-            embed=embed_info(f"History for {user.display_name}", "Select a time range:"),
+            embed=discord.Embed(
+                title=f"{EMOJI_SPYGLASS} Choose a Time Range",
+                description=f"Pulling records for {user.mention}. How far back do you want to look?",
+                color=COLOR_INFO,
+            ),
             view=view
         )
 
@@ -1009,52 +1282,46 @@ class HistoryRangeView(discord.ui.View):
         super().__init__(timeout=120)
         self.user = user
 
-    @discord.ui.button(label="Last 30 Days", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Last 30 Days", style=discord.ButtonStyle.secondary, emoji=EMOJI_MC_CLOCK)
     async def last30(self, interaction: discord.Interaction, button: discord.ui.Button):
         end = int(time.time())
         start = end - 30*86400
-        await self.show_history(interaction, start, end)
+        await self.show_history(interaction, start, end, "Last 30 Days")
 
-    @discord.ui.button(label="Last 90 Days", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Last 90 Days", style=discord.ButtonStyle.secondary, emoji=EMOJI_COMPASS)
     async def last90(self, interaction: discord.Interaction, button: discord.ui.Button):
         end = int(time.time())
         start = end - 90*86400
-        await self.show_history(interaction, start, end)
+        await self.show_history(interaction, start, end, "Last 90 Days")
 
-    @discord.ui.button(label="All", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="All Time", style=discord.ButtonStyle.secondary, emoji=EMOJI_NETHER_STAR)
     async def all_time(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.show_history(interaction, None, None)
+        await self.show_history(interaction, None, None, "All Time")
 
-    @discord.ui.button(label="Custom", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Custom Range", style=discord.ButtonStyle.primary, emoji=EMOJI_FEATHER)
     async def custom(self, interaction: discord.Interaction, button: discord.ui.Button):
         modal = CustomRangeModal(self.user)
         await interaction.response.send_modal(modal)
 
-    async def show_history(self, interaction, start_ts, end_ts):
+    async def show_history(self, interaction, start_ts, end_ts, range_label: str = ""):
         history = get_user_loa_history(self.user.id, start_ts, end_ts)
         if not history:
-            await interaction.response.send_message(embed=embed_info("No Records", f"No LOA records found for {self.user.mention} in that period."), ephemeral=True)
-            return
-
-        now = int(time.time())
-        lines = []
-        for rec in history:
-            if now < rec['start']:
-                status = "⏳ Upcoming"
-            elif now <= rec['end']:
-                status = "🟢 Active"
-            else:
-                status = "🔴 Ended"
-            lines.append(
-                f"{status}: **{rec['reason']}**\n"
-                f"-# <t:{rec['start']}:D> → <t:{rec['end']}:D> | Additional: {rec.get('additional', 'N/A')}"
+            await interaction.response.edit_message(
+                embed=embed_info(
+                    "No Records Found",
+                    f"No LOA records on file for {self.user.mention} in that period.\n\n"
+                    f"-# They've been loyally grinding away! {EMOJI_EMERALD}"
+                ),
+                view=None,
             )
-        embed = discord.Embed(
-            title=f"📜 LOA History for {self.user.display_name}",
-            description="\n\n".join(lines),
-            color=COLOR_INFO
+            return
+        suffix = f" of {self.user.display_name}" + (f" ({range_label})" if range_label else "")
+        pages = _build_history_pages(self.user.id, history, title_suffix=suffix)
+        await interaction.response.edit_message(
+            content=None,
+            embed=pages[0],
+            view=HistoryPageView(pages),
         )
-        await interaction.response.edit_message(content=None, embed=embed, view=None)
 
 class CustomRangeModal(discord.ui.Modal):
     def __init__(self, user):
@@ -1086,31 +1353,23 @@ class CustomRangeModal(discord.ui.Modal):
             return
         history = get_user_loa_history(self.user.id, start_ts, end_ts)
         if not history:
-            await interaction.response.send_message(embed=embed_info("No Records", f"No LOA records found for {self.user.mention} in that period."), ephemeral=True)
-            return
-        now = int(time.time())
-        lines = []
-        for rec in history:
-            if now < rec['start']:
-                status = "⏳ Upcoming"
-            elif now <= rec['end']:
-                status = "🟢 Active"
-            else:
-                status = "🔴 Ended"
-            lines.append(
-                f"{status}: **{rec['reason']}**\n"
-                f"-# <t:{rec['start']}:D> → <t:{rec['end']}:D> | Additional: {rec.get('additional', 'N/A')}"
+            await interaction.response.edit_message(
+                embed=embed_info(
+                    "No Records Found",
+                    f"No LOA records on file for {self.user.mention} in that date range.\n"
+                    f"-# Nothing to see here, keep mining! {EMOJI_EMERALD}"
+                ),
+                view=None,
             )
-        embed = discord.Embed(
-            title=f"📜 LOA History for {self.user.display_name}",
-            description="\n\n".join(lines),
-            color=COLOR_INFO
+            return
+        suffix = f" of {self.user.display_name} ({self.start.value} → {self.end.value})"
+        pages = _build_history_pages(self.user.id, history, title_suffix=suffix)
+        await interaction.response.edit_message(
+            content=None,
+            embed=pages[0],
+            view=HistoryPageView(pages),
         )
-        await interaction.response.edit_message(content=None, embed=embed, view=None)
 
-# ----------------------------------------------------------------------
-# Cog
-# ----------------------------------------------------------------------
 
 class LOACog(commands.Cog):
     def __init__(self, bot):
