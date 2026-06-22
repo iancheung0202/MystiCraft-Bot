@@ -103,7 +103,7 @@ async def sync_staff_to_website(client: discord.Client, active_staff: dict, guil
                     try:
                         async with session.delete(f"{WEBSITE_STAFF_API}/admin/staff/{entry['id']}", headers=headers) as resp:
                             if resp.status == 200:
-                                report.append(f"[-] Website: removed {entry['username']} (no longer staff or not linked)")
+                                report.append(f"[-] Website: removed {entry['username']} (no longer staff)")
                             else:
                                 report.append(f"[!] Website: failed to remove {entry['username']} ({resp.status})")
                     except Exception as e:

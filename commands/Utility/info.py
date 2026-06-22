@@ -83,7 +83,8 @@ BOOSTER_PERKS_TEXT = (
     f"{EMOJI_REPLY} Permission to send embed links\n\n"
     f"{EMOJI_CRYSTAL} **Booster Rank in-game** if you linked your account (<#1518004795275874405>)\n"
     f"{EMOJI_REPLY} **VIP+** rank on Lifesteal\n"
-    f"{EMOJI_REPLY} **Vanilla** rank on Vanilla"
+    f"{EMOJI_REPLY} **Survival** rank on Survival\n"
+    f"{EMOJI_REPLY} **Elite** rank on Vanilla"
 )
 
 

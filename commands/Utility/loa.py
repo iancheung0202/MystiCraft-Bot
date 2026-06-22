@@ -311,7 +311,9 @@ class ApprovalView(discord.ui.View):
                     ),
                     color=COLOR_SUCCESS,
                 )
-                await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=None)
+                post_view = PostDecisionView()
+                post_view.add_item(_MetaButton(record_id))
+                await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=post_view)
                 try:
                     user = await interaction.client.fetch_user(user_id)
                     await user.send(embed=discord.Embed(
@@ -352,7 +354,9 @@ class ApprovalView(discord.ui.View):
             ),
             color=COLOR_SUCCESS,
         )
-        await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=None)
+        post_view = PostDecisionView()
+        post_view.add_item(_MetaButton(record_id))
+        await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=post_view)
         try:
             user = await interaction.client.fetch_user(user_id)
             msg = (
@@ -416,7 +420,9 @@ class ApprovalView(discord.ui.View):
                 ),
                 color=COLOR_ERROR,
             )
-            await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=None)
+            post_view = PostDecisionView()
+            post_view.add_item(_MetaButton(record_id))
+            await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=post_view)
             try:
                 user = await interaction.client.fetch_user(user_id)
                 await user.send(embed=discord.Embed(
@@ -443,7 +449,9 @@ class ApprovalView(discord.ui.View):
             ),
             color=COLOR_ERROR,
         )
-        await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=None)
+        post_view = PostDecisionView()
+        post_view.add_item(_MetaButton(record_id))
+        await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=post_view)
         try:
             user = await interaction.client.fetch_user(user_id)
             await user.send(embed=discord.Embed(
@@ -498,6 +506,172 @@ class ApprovalView(discord.ui.View):
             ephemeral=True,
         )
 
+
+class DeleteConfirmView(discord.ui.View):
+    """Ephemeral confirmation view for LOA record deletion."""
+
+    def __init__(self, user_id: int, record_id: str, ref, original_message: discord.Message):
+        super().__init__(timeout=60)
+        self.user_id = user_id
+        self.record_id = record_id
+        self.ref = ref
+        self.original_message = original_message
+
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.gray, emoji=EMOJI_BARRIER)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        rec = self.ref.get()
+        if not rec:
+            await interaction.response.edit_message(
+                embed=embed_error("Not Found", "This LOA record no longer exists."),
+                view=None,
+            )
+            return
+
+        self.ref.delete()
+        result_embed = discord.Embed(
+            title=f"{EMOJI_BARRIER} LOA Deleted",
+            description=(
+                f"{EMOJI_FEATHER} The LOA record for <@{self.user_id}> was deleted by <@{interaction.user.id}>."
+            ),
+            color=COLOR_ERROR,
+        )
+        await interaction.response.edit_message(embed=result_embed, view=None)
+
+        # Disable and relabel the delete button on the original log message
+        try:
+            original_view = discord.ui.View.from_message(self.original_message, timeout=None)
+            for item in original_view.children:
+                if isinstance(item, discord.ui.Button) and item.custom_id == "loa_post_delete":
+                    item.label = "Record Deleted"
+                    item.style = discord.ButtonStyle.danger
+                    item.disabled = True
+                    item.emoji = ""
+                    break
+            await self.original_message.edit(view=original_view)
+        except Exception:
+            pass
+
+    async def on_timeout(self):
+        pass  # ephemeral message expires naturally
+
+
+class PostDecisionView(discord.ui.View):
+    """
+    Persistent view shown after an LOA is approved or rejected.
+    No constructor parameters — resolves record info from the message itself.
+    Contains: delete button, history button, disabled logo button (data carrier).
+    """
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    def _resolve(self, interaction: discord.Interaction):
+        """Return (user_id, record_id) from the message."""
+        embed0 = interaction.message.embeds[0] if interaction.message.embeds else None
+        user_id = _parse_user_id_from_embed(embed0)
+        record_id, _, _ = _parse_meta_button(interaction.message)
+        return user_id, record_id
+
+    @discord.ui.button(
+        label="Delete Record",
+        style=discord.ButtonStyle.gray,
+        emoji=EMOJI_BARRIER,
+        custom_id="loa_post_delete",
+    )
+    async def delete_record(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not is_manager(interaction.user):
+            await interaction.response.send_message(
+                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} Only Managers+ can delete LOA records."),
+                ephemeral=True,
+            )
+            return
+
+        user_id, record_id = self._resolve(interaction)
+        if not user_id or not record_id:
+            await interaction.response.send_message(
+                embed=embed_error("Parse Error", "Couldn't read record details from this message."),
+                ephemeral=True,
+            )
+            return
+
+        ref = db.reference(f"LOA/{user_id}/{record_id}")
+        rec = ref.get()
+        if not rec:
+            await interaction.response.send_message(
+                embed=embed_error("Not Found", "This LOA record no longer exists."),
+                ephemeral=True,
+            )
+            return
+
+        now = int(time.time())
+        status = rec.get("status", "unknown")
+        start_ts = rec.get("start", 0)
+        end_ts = rec.get("end", 0)
+        is_active = status == "active" and start_ts <= now <= end_ts
+        is_upcoming = status == "active" and start_ts > now
+
+        impact_lines = [
+            f"{EMOJI_STEVE} **User:** <@{user_id}>",
+            f"{EMOJI_BOOK} **Reason:** {rec.get('reason', 'No reason')}",
+            f"{EMOJI_MC_CLOCK} **Period:** <t:{start_ts}:D> → <t:{end_ts}:D>",
+            f"{EMOJI_HOURGLASS} **Status:** {status.title()}",
+        ]
+        if is_active:
+            impact_lines.append(f"\n{EMOJI_GOLD_INGOT} **Warning:** This LOA is **currently active**. Deleting it will remove them from the active LOA list immediately.")
+        elif is_upcoming:
+            impact_lines.append(f"\n{EMOJI_GOLD_INGOT} **Warning:** This LOA is **upcoming**. The staff member will not be notified of this deletion.")
+        else:
+            impact_lines.append(f"\n{EMOJI_EMERALD} This record is no longer active. Deletion will only affect history.")
+
+        confirm_embed = discord.Embed(
+            title=f"{EMOJI_BARRIER} Confirm Deletion",
+            description="\n".join(impact_lines),
+            color=COLOR_WARNING,
+        )
+        confirm_embed.set_footer(text="This action is permanent and cannot be undone.")
+
+        await interaction.response.send_message(
+            embed=confirm_embed,
+            view=DeleteConfirmView(user_id, record_id, ref, interaction.message),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(
+        label="History",
+        style=discord.ButtonStyle.secondary,
+        emoji=EMOJI_BOOK,
+        custom_id="loa_post_history",
+    )
+    async def view_history(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not is_manager(interaction.user):
+            await interaction.response.send_message(
+                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} Only Managers+ can view LOA history."),
+                ephemeral=True,
+            )
+            return
+
+        user_id, _ = self._resolve(interaction)
+        if not user_id:
+            await interaction.response.send_message(
+                embed=embed_error("Parse Error", "Couldn't determine the user from this message."),
+                ephemeral=True,
+            )
+            return
+
+        history = get_user_loa_history(user_id)
+        if not history:
+            await interaction.response.send_message(
+                embed=embed_info("No Records", f"No LOA history on file for <@{user_id}>."),
+                ephemeral=True,
+            )
+            return
+
+        pages = _build_history_pages(user_id, history)
+        await interaction.response.send_message(
+            embed=pages[0],
+            view=HistoryPageView(pages),
+            ephemeral=True,
+        )
 
 def _status_row(rec: dict) -> tuple[str, str]:
     """Return (emoji, label) for a record based on its stored status and timing."""
