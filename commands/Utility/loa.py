@@ -14,10 +14,11 @@ STAFF_SERVER_ROLES = [ROLE_IDS[SERVER_IDS["staff"]]["roles"][k] for k in ["owner
 MANAGER_ROLES = [ROLE_IDS[SERVER_IDS["staff"]]["roles"]["owner"], ROLE_IDS[SERVER_IDS["staff"]]["roles"]["manager"]]
 
 NEGATIVE_OFFSETS = [f"UTC{i}" for i in range(-12, 0)]
-POSITIVE_OFFSETS = [f"UTC+{i}" for i in range(0, 15)]  # includes UTC+0
+POSITIVE_OFFSETS = [f"UTC+{i}" for i in range(0, 15)]
 
 LOA_LOG_CHANNEL = 1517598730973609984
 APPROVAL_ROLE = 1165675275821002835
+RECORDS_PER_PAGE = 5
 
 COLOR_SUCCESS = 0x2ecc71
 COLOR_ERROR   = 0xe74c3c
@@ -39,7 +40,7 @@ EMOJI_FEATHER       = "<:feather:1518454349053952150>"
 EMOJI_BARRIER       = "<:barrier:1518454369887195228>"
 EMOJI_SPYGLASS      = "<:spyglass:1518454328480891083>"
 EMOJI_HOURGLASS     = "<:hourglass:1518454206162538546>"
-EMOJI_LOGO = "<:mysticraftlogo:1263811799237787789>"
+EMOJI_LOGO          = "<:mysticraftlogo:1263811799237787789>"
 
 
 def embed_success(title: str, description: str = None) -> discord.Embed:
@@ -85,17 +86,14 @@ def get_loas(status_filter: str = None) -> list[dict]:
     return result
 
 def get_active_loas() -> list[dict]:
-    """Return LOAs with status='active' and end>=now."""
     now = int(time.time())
     all_loas = get_loas(status_filter="active")
     return [l for l in all_loas if l.get("end") >= now]
 
 def get_pending_loas() -> list[dict]:
-    """Return all pending LOAs."""
     return get_loas(status_filter="pending")
 
 def get_user_loas(user_id: int, status_filter: str = None) -> list[dict]:
-    """Get a user's LOAs, optionally filtered by status."""
     records = db.reference("LOA").child(str(user_id)).get() or {}
     result = []
     for record_id, rec in records.items():
@@ -108,7 +106,6 @@ def get_user_loas(user_id: int, status_filter: str = None) -> list[dict]:
     return sorted(result, key=lambda x: x.get("start", 0))
 
 def get_user_loa_history(user_id: int, start_ts: int = None, end_ts: int = None) -> list[dict]:
-    """Get all LOA records for a user, optionally filtered by date range."""
     records = db.reference("LOA").child(str(user_id)).get() or {}
     history = []
     for record_id, rec in records.items():
@@ -123,7 +120,6 @@ def get_user_loa_history(user_id: int, start_ts: int = None, end_ts: int = None)
     return sorted(history, key=lambda x: x.get("start", 0), reverse=True)
 
 def format_date_plain(ts: int, offset_str: str = "UTC+0") -> str:
-    """Return a plain date string (no Discord timestamp) for dropdown labels."""
     try:
         hours = int(re.search(r"([+-]?\d+)", offset_str).group(1))
     except:
@@ -133,7 +129,6 @@ def format_date_plain(ts: int, offset_str: str = "UTC+0") -> str:
     return dt.strftime("%Y-%m-%d")
 
 def get_display_status(rec: dict) -> str:
-    """Return 'Active', 'Upcoming', or 'Ended' based on the current time."""
     now = int(time.time())
     start = rec.get('start', 0)
     end = rec.get('end', 0)
@@ -145,7 +140,6 @@ def get_display_status(rec: dict) -> str:
         return "Ended"
 
 def create_loa_embed() -> discord.Embed:
-    """Create the embed for the LOA panel (active + upcoming)."""
     loas = get_active_loas()
     embed = discord.Embed(
         title=f"{EMOJI_BOOK} Staff Leave of Absence",
@@ -192,66 +186,52 @@ def create_loa_embed() -> discord.Embed:
     return embed
 
 
-def _make_meta_custom_id(record_id: str, old_record_id: str = None) -> str:
+def meta_custom_id(record_id: str, old_record_id: str = None) -> str:
     if old_record_id:
         return f"loa_meta:{record_id}:{old_record_id}"
     return f"loa_meta:{record_id}"
 
-def _parse_meta_button(message: discord.Message) -> tuple[str | None, bool, str | None]:
-    """
-    Find the data-carrier button in the message components and parse it.
-    Returns (record_id, is_edit, old_record_id).
-    """
+def parse_meta_button(message: discord.Message) -> tuple[str | None, bool, str | None]:
     for row in message.components:
         for component in row.children:
             if isinstance(component, discord.Button) and component.custom_id and component.custom_id.startswith("loa_meta:"):
                 parts = component.custom_id.split(":")
-                # parts[0] = "loa_meta", parts[1] = record_id, parts[2] = old_record_id (optional)
                 record_id = parts[1] if len(parts) > 1 else None
                 old_record_id = parts[2] if len(parts) > 2 else None
                 is_edit = old_record_id is not None
                 return record_id, is_edit, old_record_id
     return None, False, None
 
-def _parse_user_id_from_embed(embed: discord.Embed) -> int | None:
-    """Extract user_id from the first <@id> mention in the embed description."""
+def parse_user_id(embed: discord.Embed) -> int | None:
     if not embed or not embed.description:
         return None
     match = re.search(r"<@(\d+)>", embed.description)
     return int(match.group(1)) if match else None
 
 
-class _MetaButton(discord.ui.Button):
-    """Invisible data-carrier button. Always disabled; custom_id holds LOA record info."""
+class MetaButton(discord.ui.Button):
     def __init__(self, record_id: str, old_record_id: str = None):
         super().__init__(
             style=discord.ButtonStyle.secondary,
             emoji=EMOJI_LOGO,
-            custom_id=_make_meta_custom_id(record_id, old_record_id),
+            custom_id=meta_custom_id(record_id, old_record_id),
             disabled=True,
         )
 
     async def callback(self, interaction: discord.Interaction):
-        pass  # never fires — button is permanently disabled
+        pass
 
 
 class ApprovalView(discord.ui.View):
-    """
-    Persistent approval view.
-    State is stored in the _MetaButton custom_id; user_id from the embed description.
-    Call ApprovalView(record_id) or ApprovalView(record_id, old_record_id) when sending.
-    """
-
     def __init__(self, record_id: str = None, old_record_id: str = None):
         super().__init__(timeout=None)
         if record_id is not None:
-            self.add_item(_MetaButton(record_id, old_record_id))
+            self.add_item(MetaButton(record_id, old_record_id))
 
-    def _resolve(self, interaction: discord.Interaction):
-        """Return (user_id, record_id, is_edit, old_record_id) from the message."""
+    def resolve(self, interaction: discord.Interaction):
         embed0 = interaction.message.embeds[0] if interaction.message.embeds else None
-        user_id = _parse_user_id_from_embed(embed0)
-        record_id, is_edit, old_record_id = _parse_meta_button(interaction.message)
+        user_id = parse_user_id(embed0)
+        record_id, is_edit, old_record_id = parse_meta_button(interaction.message)
         return user_id, record_id, is_edit, old_record_id
 
     @discord.ui.button(
@@ -270,7 +250,7 @@ class ApprovalView(discord.ui.View):
         
         embed0 = interaction.message.embeds[0] if interaction.message.embeds else None
 
-        user_id, record_id, is_edit, old_record_id = self._resolve(interaction)
+        user_id, record_id, is_edit, old_record_id = self.resolve(interaction)
         if not user_id or not record_id:
             await interaction.response.send_message(
                 embed=embed_error("Parse Error", "Couldn't read request details from this message."),
@@ -312,7 +292,7 @@ class ApprovalView(discord.ui.View):
                     color=COLOR_SUCCESS,
                 )
                 post_view = PostDecisionView()
-                post_view.add_item(_MetaButton(record_id))
+                post_view.add_item(MetaButton(record_id))
                 await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=post_view)
                 try:
                     user = await interaction.client.fetch_user(user_id)
@@ -355,7 +335,7 @@ class ApprovalView(discord.ui.View):
             color=COLOR_SUCCESS,
         )
         post_view = PostDecisionView()
-        post_view.add_item(_MetaButton(record_id))
+        post_view.add_item(MetaButton(record_id))
         await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=post_view)
         try:
             user = await interaction.client.fetch_user(user_id)
@@ -390,7 +370,7 @@ class ApprovalView(discord.ui.View):
             return
 
         embed0 = interaction.message.embeds[0] if interaction.message.embeds else None
-        user_id, record_id, is_edit, old_record_id = self._resolve(interaction)
+        user_id, record_id, is_edit, old_record_id = self.resolve(interaction)
         if not user_id or not record_id:
             await interaction.response.send_message(
                 embed=embed_error("Parse Error", "Couldn't read request details from this message."),
@@ -421,7 +401,7 @@ class ApprovalView(discord.ui.View):
                 color=COLOR_ERROR,
             )
             post_view = PostDecisionView()
-            post_view.add_item(_MetaButton(record_id))
+            post_view.add_item(MetaButton(record_id))
             await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=post_view)
             try:
                 user = await interaction.client.fetch_user(user_id)
@@ -450,7 +430,7 @@ class ApprovalView(discord.ui.View):
             color=COLOR_ERROR,
         )
         post_view = PostDecisionView()
-        post_view.add_item(_MetaButton(record_id))
+        post_view.add_item(MetaButton(record_id))
         await interaction.response.edit_message(content=None, embeds=[result_embed, embed0], view=post_view)
         try:
             user = await interaction.client.fetch_user(user_id)
@@ -483,7 +463,7 @@ class ApprovalView(discord.ui.View):
             return
 
         embed0 = interaction.message.embeds[0] if interaction.message.embeds else None
-        user_id, _, _, _ = self._resolve(interaction)
+        user_id, _, _, _ = self.resolve(interaction)
         if not user_id:
             await interaction.response.send_message(
                 embed=embed_error("Parse Error", "Couldn't determine the user from this message."),
@@ -499,7 +479,7 @@ class ApprovalView(discord.ui.View):
             )
             return
 
-        pages = _build_history_pages(user_id, history)
+        pages = build_history_pages(user_id, history)
         await interaction.response.send_message(
             embed=pages[0],
             view=HistoryPageView(pages),
@@ -508,8 +488,6 @@ class ApprovalView(discord.ui.View):
 
 
 class DeleteConfirmView(discord.ui.View):
-    """Ephemeral confirmation view for LOA record deletion."""
-
     def __init__(self, user_id: int, record_id: str, ref, original_message: discord.Message):
         super().__init__(timeout=60)
         self.user_id = user_id
@@ -537,7 +515,6 @@ class DeleteConfirmView(discord.ui.View):
         )
         await interaction.response.edit_message(embed=result_embed, view=None)
 
-        # Disable and relabel the delete button on the original log message
         try:
             original_view = discord.ui.View.from_message(self.original_message, timeout=None)
             for item in original_view.children:
@@ -552,24 +529,18 @@ class DeleteConfirmView(discord.ui.View):
             pass
 
     async def on_timeout(self):
-        pass  # ephemeral message expires naturally
+        pass
 
 
 class PostDecisionView(discord.ui.View):
-    """
-    Persistent view shown after an LOA is approved or rejected.
-    No constructor parameters — resolves record info from the message itself.
-    Contains: delete button, history button, disabled logo button (data carrier).
-    """
-
     def __init__(self):
         super().__init__(timeout=None)
 
-    def _resolve(self, interaction: discord.Interaction):
+    def resolve(self, interaction: discord.Interaction):
         """Return (user_id, record_id) from the message."""
         embed0 = interaction.message.embeds[0] if interaction.message.embeds else None
-        user_id = _parse_user_id_from_embed(embed0)
-        record_id, _, _ = _parse_meta_button(interaction.message)
+        user_id = parse_user_id(embed0)
+        record_id, _, _ = parse_meta_button(interaction.message)
         return user_id, record_id
 
     @discord.ui.button(
@@ -586,7 +557,7 @@ class PostDecisionView(discord.ui.View):
             )
             return
 
-        user_id, record_id = self._resolve(interaction)
+        user_id, record_id = self.resolve(interaction)
         if not user_id or not record_id:
             await interaction.response.send_message(
                 embed=embed_error("Parse Error", "Couldn't read record details from this message."),
@@ -650,7 +621,7 @@ class PostDecisionView(discord.ui.View):
             )
             return
 
-        user_id, _ = self._resolve(interaction)
+        user_id, _ = self.resolve(interaction)
         if not user_id:
             await interaction.response.send_message(
                 embed=embed_error("Parse Error", "Couldn't determine the user from this message."),
@@ -666,15 +637,14 @@ class PostDecisionView(discord.ui.View):
             )
             return
 
-        pages = _build_history_pages(user_id, history)
+        pages = build_history_pages(user_id, history)
         await interaction.response.send_message(
             embed=pages[0],
             view=HistoryPageView(pages),
             ephemeral=True,
         )
 
-def _status_row(rec: dict) -> tuple[str, str]:
-    """Return (emoji, label) for a record based on its stored status and timing."""
+def status(rec: dict) -> tuple[str, str]:
     now = int(time.time())
     status = rec.get("status", "unknown")
     if status == "active":
@@ -694,13 +664,7 @@ def _status_row(rec: dict) -> tuple[str, str]:
         return EMOJI_NETHER_STAR, status.title()
 
 
-_RECORDS_PER_PAGE = 5
-
-def _build_history_pages(user_id: int, history: list[dict], title_suffix: str = "") -> list[discord.Embed]:
-    """
-    Build a paginated list of history embeds (newest-first, _RECORDS_PER_PAGE per page).
-    The summary line appears on every page for quick reference.
-    """
+def build_history_pages(user_id: int, history: list[dict], title_suffix: str = "") -> list[discord.Embed]:
     STATUS_COLORS = {
         "active":   COLOR_SUCCESS,
         "pending":  COLOR_WARNING,
@@ -708,7 +672,6 @@ def _build_history_pages(user_id: int, history: list[dict], title_suffix: str = 
         "replaced": COLOR_INFO,
     }
 
-    # Summary counts (across all records)
     counts: dict[str, int] = {}
     for rec in history:
         s = rec.get("status", "unknown")
@@ -725,10 +688,9 @@ def _build_history_pages(user_id: int, history: list[dict], title_suffix: str = 
         summary_parts.append(f"{EMOJI_ENDER_PEARL} {counts['replaced']} replaced")
     summary_line = "  •  ".join(summary_parts) if summary_parts else "No records"
 
-    # Build one text block per record
     record_lines: list[str] = []
     for rec in history:
-        emoji, label = _status_row(rec)
+        emoji, label = status(rec)
         duration_days = max(1, (rec.get("end", rec.get("start", 0)) - rec.get("start", 0)) // 86400 + 1)
         day_word = "day" if duration_days == 1 else "days"
         additional = rec.get("additional", "").strip()
@@ -741,10 +703,8 @@ def _build_history_pages(user_id: int, history: list[dict], title_suffix: str = 
             line += f"\n-# {EMOJI_BOOK} {additional}"
         record_lines.append(line)
 
-    # Chunk into pages
-    chunks = [record_lines[i:i + _RECORDS_PER_PAGE] for i in range(0, len(record_lines), _RECORDS_PER_PAGE)]
+    chunks = [record_lines[i:i + RECORDS_PER_PAGE] for i in range(0, len(record_lines), RECORDS_PER_PAGE)]
     total_pages = len(chunks)
-    # Pick embed colour from the most recent (index 0) record
     embed_color = STATUS_COLORS.get(history[0].get("status", "active"), COLOR_INFO)
 
     pages: list[discord.Embed] = []
@@ -765,43 +725,39 @@ def _build_history_pages(user_id: int, history: list[dict], title_suffix: str = 
 
 
 class HistoryPageView(discord.ui.View):
-    """Pagination view for LOA history embeds."""
-
     def __init__(self, pages: list[discord.Embed]):
         super().__init__(timeout=180)
         self.pages = pages
         self.page = 0
-        # Disable nav buttons when there's only one page
         if len(pages) <= 1:
             for item in self.children:
                 item.disabled = True
 
-    def _current_embed(self) -> discord.Embed:
+    def update_embed(self) -> discord.Embed:
         return self.pages[self.page]
 
     @discord.ui.button(style=discord.ButtonStyle.grey, emoji="<:fastbackward:1351972112696479824>")
     async def super_prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.page = 0
-        await interaction.response.edit_message(embed=self._current_embed(), view=self)
+        await interaction.response.edit_message(embed=self.update_embed(), view=self)
 
     @discord.ui.button(style=discord.ButtonStyle.grey, emoji="<:backarrow:1351972111010369618>")
     async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.page = (self.page - 1) % len(self.pages)
-        await interaction.response.edit_message(embed=self._current_embed(), view=self)
+        await interaction.response.edit_message(embed=self.update_embed(), view=self)
 
     @discord.ui.button(style=discord.ButtonStyle.grey, emoji="<:rightarrow:1351972116819480616>")
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.page = (self.page + 1) % len(self.pages)
-        await interaction.response.edit_message(embed=self._current_embed(), view=self)
+        await interaction.response.edit_message(embed=self.update_embed(), view=self)
 
     @discord.ui.button(style=discord.ButtonStyle.grey, emoji="<:fastforward:1351972114433048719>")
     async def super_next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.page = len(self.pages) - 1
-        await interaction.response.edit_message(embed=self._current_embed(), view=self)
+        await interaction.response.edit_message(embed=self.update_embed(), view=self)
 
 
 class LOAPanelView(discord.ui.View):
-    """Persistent view for the LOA management panel."""
     def __init__(self):
         super().__init__(timeout=None)
 
@@ -811,7 +767,6 @@ class LOAPanelView(discord.ui.View):
             await interaction.response.send_message(embed=embed_error("Access Denied", "You are not a staff member."), ephemeral=True)
             return
 
-        # Check if user already has an active/upcoming LOA
         existing = get_user_loas(interaction.user.id, status_filter="active")
         now = int(time.time())
         existing = [l for l in existing if l.get("end") >= now]
@@ -1490,7 +1445,7 @@ class HistoryRangeView(discord.ui.View):
             )
             return
         suffix = f" of {self.user.display_name}" + (f" ({range_label})" if range_label else "")
-        pages = _build_history_pages(self.user.id, history, title_suffix=suffix)
+        pages = build_history_pages(self.user.id, history, title_suffix=suffix)
         await interaction.response.edit_message(
             content=None,
             embed=pages[0],
@@ -1537,7 +1492,7 @@ class CustomRangeModal(discord.ui.Modal):
             )
             return
         suffix = f" of {self.user.display_name} ({self.start.value} → {self.end.value})"
-        pages = _build_history_pages(self.user.id, history, title_suffix=suffix)
+        pages = build_history_pages(self.user.id, history, title_suffix=suffix)
         await interaction.response.edit_message(
             content=None,
             embed=pages[0],

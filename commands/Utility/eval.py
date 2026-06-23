@@ -1,10 +1,8 @@
 import discord
-import os
 import io
 import textwrap
 import traceback
 
-from discord import app_commands
 from discord.ext import commands
 
 class Eval(commands.Cog):

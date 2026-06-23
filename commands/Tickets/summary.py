@@ -364,28 +364,22 @@ def build_tester_checkup_pages(stats: list[dict], week_start_ts: int) -> list[di
     per_page = 15
     pages    = []
 
-    summary_line = (
-        f"{EMOJI_EMERALD} `{len(met)}` met  •  "
-        f"{EMOJI_REDSTONE} `{len(not_met)}` not met  •  "
-        f"{EMOJI_STEVE} `{len(stats)}` testers total"
-    )
-
-    def _make_base() -> discord.Embed:
+    def make_base() -> discord.Embed:
         return discord.Embed(
             title=f"{EMOJI_BOOK} Tester Weekly Checkup",
             description=(
                 f"{EMOJI_MC_CLOCK} **Week starting:** <t:{week_start_ts}:D>\n"
                 f"{EMOJI_HOURGLASS} **Requirement:** `{TESTER_WEEKLY_REQUIREMENT}` tests\n"
-                f"{summary_line}\n"
+                f"{EMOJI_STEVE} **Total:** `{len(stats)}` current testers\n"
             ),
             color=COLOR_WARNING,
         )
 
     not_met_lines = [f"{EMOJI_REDSTONE} <@{uid}> — `{n}` tests  •  `{h}` high" for uid, n, h in not_met]
     met_lines     = [f"{EMOJI_EMERALD} <@{uid}> — `{n}` tests  •  `{h}` high" for uid, n, h in met]
-    sections      = [("Not Met", not_met_lines), ("Met Requirement", met_lines)]
+    sections      = [(f"Not Met ({len(not_met)})", not_met_lines), (f"Met Requirement ({len(met)})", met_lines)]
 
-    current = _make_base()
+    current = make_base()
     current_count = 0
 
     for section_title, lines in sections:
@@ -401,7 +395,7 @@ def build_tester_checkup_pages(stats: list[dict], week_start_ts: int) -> list[di
             if current_count >= per_page:
                 current.add_field(name=raw_title, value="\n".join(chunk), inline=False)
                 pages.append(current)
-                current = _make_base()
+                current = make_base()
                 chunk   = []
                 current_count = 0
                 raw_title = f"{section_title} (cont.)"

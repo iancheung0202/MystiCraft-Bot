@@ -21,7 +21,7 @@ EMOJI_BARRIER       = "<:barrier:1518454369887195228>"
 EMOJI_SPYGLASS      = "<:spyglass:1518454328480891083>"
 EMOJI_HOURGLASS     = "<:hourglass:1518454206162538546>"
 EMOJI_STORE         = "<:shop:1518114830501023935>"
-EMOJI_CRYSTAL      = "<:crystal:1518050761010057290>"
+EMOJI_CRYSTAL       = "<:crystal:1518050761010057290>"
 EMOJI_CONNECT       = "<:lodestone:1518038285354795158>"
 EMOJI_COMMAND_BLOCK = "<a:command_block:1518032605692297256>"
 EMOJI_WOOD          = "<:wood:1518486506703163402>"
@@ -98,25 +98,25 @@ def build_info_container(timestamp: int) -> discord.ui.Container:
         row1 = discord.ui.ActionRow(
             discord.ui.Button(
                 label="YouTube",
-                emoji=discord.PartialEmoji.from_str(EMOJI_YOUTUBE),
+                emoji=EMOJI_YOUTUBE,
                 style=discord.ButtonStyle.link,
                 url="https://youtube.com/@ninjamcyt"
             ),
             discord.ui.Button(
                 label="Twitter",
-                emoji=discord.PartialEmoji.from_str(EMOJI_TWITTER),
+                emoji=EMOJI_TWITTER,
                 style=discord.ButtonStyle.link,
                 url="https://twitter.com/playmysticraft"
             ),
             discord.ui.Button(
                 label="Instagram",
-                emoji=discord.PartialEmoji.from_str(EMOJI_INSTAGRAM),
+                emoji=EMOJI_INSTAGRAM,
                 style=discord.ButtonStyle.link,
                 url="https://instagram.com/playmysticraft"
             ),
             discord.ui.Button(
                 label="TikTok",
-                emoji=discord.PartialEmoji.from_str(EMOJI_TIKTOK),
+                emoji=EMOJI_TIKTOK,
                 style=discord.ButtonStyle.link,
                 url="https://tiktok.com/@mysticraftnetwork"
             ),
@@ -126,36 +126,36 @@ def build_info_container(timestamp: int) -> discord.ui.Container:
         row2 = discord.ui.ActionRow(
             discord.ui.Button(
                 label="Website",
-                emoji=discord.PartialEmoji.from_str(EMOJI_MAP),
+                emoji=EMOJI_MAP,
                 style=discord.ButtonStyle.link,
                 url="https://mysticraft.xyz"
             ),
             discord.ui.Button(
                 label="Store",
-                emoji=discord.PartialEmoji.from_str(EMOJI_STORE),
+                emoji=EMOJI_STORE,
                 style=discord.ButtonStyle.link,
                 url="https://store.mysticraft.xyz"
             ),
             discord.ui.Button(
                 label="Tierlist",
-                emoji=discord.PartialEmoji.from_str(EMOJI_TIERLIST),
+                emoji=EMOJI_TIERLIST,
                 style=discord.ButtonStyle.link,
                 url="https://tierlist.mysticraft.xyz"
             ),
             discord.ui.Button(
                 label="Staff",
-                emoji=discord.PartialEmoji.from_str(EMOJI_STEVE),
+                emoji=EMOJI_STEVE,
                 style=discord.ButtonStyle.link,
                 url="https://mysticraft.xyz/staff"
             ),
         )
-
         sep3 = discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.large)
         level_roles = discord.ui.TextDisplay(LEVEL_ROLES_TEXT)
         sep4 = discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.large)
         booster_perks = discord.ui.TextDisplay(BOOSTER_PERKS_TEXT)
         sep5 = discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.large)
         footer = discord.ui.TextDisplay(f"-# {EMOJI_MC_CLOCK} **Last updated:** <t:{timestamp}:R>")
+    
     return InfoContainer(accent_color=0x1ec7f1)
 
 
