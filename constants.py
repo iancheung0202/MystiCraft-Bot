@@ -99,13 +99,13 @@ CATEGORY_IDS = {
     }
 }
 
-CATEGORY_EMOJIS_MAP = {
-    "password reset": "🖥️",
-    "other questions": "❓",
+CATEGORY_EMOJIS_MAP = { # follows category name instead of ticket dropdown title, only used in summary.py
+    "password issues": "🖥️",
+    "server questions": "❓",
     "billing support": "💰",
-    "punishment appeals": "✍️",
+    "appeals": "✍️",
     "player reports": "⚠️",
-    "bug/glitch reports": "🐛",
+    "bug reports": "🐛",
     "staff reports": "👤"
 }
 
