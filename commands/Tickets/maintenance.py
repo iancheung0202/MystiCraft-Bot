@@ -208,10 +208,11 @@ async def ticket_maintenance_cycle(bot):
 
     updates = {}
 
+    allowed_categories = [cat_id for server_id, categories in CATEGORY_IDS.items() if "application" not in str(server_id) for cat_id in categories.values()]
     for guild in bot.guilds:
         for channel in guild.text_channels:
             try:
-                if not channel.category or channel.category.id not in [cat_id for server_id, categories in CATEGORY_IDS.items() if server_id != "application" for cat_id in categories.values()]:
+                if not channel.category or channel.category.id not in allowed_categories:
                     continue
                 if not channel.topic:
                     continue
@@ -256,8 +257,8 @@ async def ticket_maintenance_cycle(bot):
                                 embed = discord.Embed(
                                     title="⚠️ Automatic Notification ⚠️",
                                     description=(
-                                        f"We haven't heard from you in a while regarding the ticket you previously opened in **{channel.guild.name}**. To prevent your ticket from being automatically closed, please **respond within 24 hours.**\n\n"
-                                        "If you no longer need assistance or your issue has been resolved, **please still let us know in the ticket** so we can help close the ticket."
+                                        f"We haven't heard from you in a while in the ticket you opened earlier in **{channel.guild.name}**. Please **respond within 24 hours** to prevent your ticket from being automatically closed.\n\n"
+                                        "-# If you no longer need assistance or your issue has been resolved, **please let us know in the ticket** or close the ticket."
                                     ),
                                     color=0xE44D41,
                                 )
