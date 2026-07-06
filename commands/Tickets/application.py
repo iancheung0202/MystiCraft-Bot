@@ -10,7 +10,7 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ui import Button, View
 
-from commands.Tickets.tickets import check_for_manager
+from commands.Tickets.tickets import check_for_admin
 from constants import SERVER_IDS, CATEGORY_IDS, COOLDOWN_BYPASS_USER_IDS, ROLE_IDS, LOG_CHANNEL_IDS
 
 class StaffApp(commands.GroupCog, name="application"):
@@ -142,7 +142,7 @@ class ApplicationDelete(discord.ui.View):
         emoji="✉️",
     )
     async def delete_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await check_for_manager(interaction):
+        if not await check_for_admin(interaction):
             return await interaction.response.send_message("❌ You don't have permission to use this button.", ephemeral=True)
         embed = discord.Embed(
             title="Deleting Ticket...",
@@ -163,7 +163,7 @@ class ApplicationDelete(discord.ui.View):
     async def add_applicant(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
-        if not await check_for_manager(interaction):
+        if not await check_for_admin(interaction):
             return await interaction.response.send_message("❌ You don't have permission to use this button.", ephemeral=True)
         user = interaction.guild.get_member(
             int(interaction.message.embeds[0].description.split("`")[1])
@@ -204,7 +204,7 @@ class AcceptRejectButton(discord.ui.View):
         label="Accept", style=discord.ButtonStyle.green, custom_id="accept_app"
     )
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await check_for_manager(interaction):
+        if not await check_for_admin(interaction):
             return await interaction.response.send_message("❌ You don't have permission to use this button.", ephemeral=True)
         if len(interaction.message.embeds) == 0:
             user = interaction.guild.get_member(int(interaction.message.content.split("`")[1]))
@@ -264,7 +264,7 @@ class AcceptRejectButton(discord.ui.View):
         label="Reject", style=discord.ButtonStyle.red, custom_id="reject_app"
     )
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await check_for_manager(interaction):
+        if not await check_for_admin(interaction):
             return await interaction.response.send_message("❌ You don't have permission to use this button.", ephemeral=True)
         if len(interaction.message.embeds) == 0:
             user = interaction.guild.get_member(int(interaction.message.content.split("`")[1]))
@@ -298,7 +298,7 @@ class AcceptRejectButton(discord.ui.View):
         label="Add to Channel", style=discord.ButtonStyle.grey, custom_id="add_applicant_to_channel"
     )
     async def add_applicant(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not await check_for_manager(interaction):    
+        if not await check_for_admin(interaction):    
             return await interaction.response.send_message("❌ You don't have permission to use this button.", ephemeral=True)
         user = interaction.guild.get_member(int(interaction.message.embeds[0].description.split("`")[1]))
         application = "staff application" if "staff" in interaction.message.embeds[0].title.lower() else "media application"
@@ -388,6 +388,7 @@ class ApplicationView(discord.ui.View):
             db_cooldown_path = "/Staff App Cooldown" if is_staff else "/Media App Cooldown"
             category_key = "staff" if is_staff else "media"
             log_title = "Staff Application" if is_staff else "Media Application"
+            cooldown_days = 30
             
             if is_staff:
                 requirements = (
@@ -445,6 +446,7 @@ class ApplicationView(discord.ui.View):
             db_cooldown_path = "/Staff App Cooldown" if is_staff else "/Tester App Cooldown"
             category_key = "staff" if is_staff else "tester"
             log_title = "Tierlist Staff Application" if is_staff else "Tester Application"
+            cooldown_days = 30 if is_staff else 7
             
             if is_staff:
                 requirements = (
@@ -494,17 +496,17 @@ class ApplicationView(discord.ui.View):
                     "Before we submit your application, is there anything else you would like us to know?",
                 ]
 
-            if not any(tier in role.name for role in interaction.user.roles if "[" not in role.name and "]" not in role.name for tier in ["LT3", "HT3", "LT2", "HT2"]):
-                return await interaction.response.send_message(content="❌ You must have at least a LT3+ gamemode role to apply for a tester position.", ephemeral=True)
+                if not any(tier in role.name for role in interaction.user.roles if "[" not in role.name and "]" not in role.name for tier in ["LT3", "HT3", "LT2", "HT2"]):
+                    return await interaction.response.send_message(content="❌ You must have at least a LT3+ gamemode role to apply for a tester position.", ephemeral=True)
 
         ref = db.reference(db_cooldown_path)
         ticketcooldown = ref.get() or {}
         for key, value in ticketcooldown.items():
             if value.get("User ID") == interaction.user.id:
                 LAST_CREATED = value["Timestamp"]
-                if (int(interaction.created_at.timestamp()) - int(LAST_CREATED)) < 30 * 86400 and interaction.user.id not in COOLDOWN_BYPASS_USER_IDS:
+                if (int(interaction.created_at.timestamp()) - int(LAST_CREATED)) < cooldown_days * 86400 and interaction.user.id not in COOLDOWN_BYPASS_USER_IDS:
                     return await interaction.response.send_message(
-                        content=f"You are on a cooldown. Try again <t:{int(LAST_CREATED) + 30 * 86400}:R>",
+                        content=f"You are on a cooldown. Try again <t:{int(LAST_CREATED) + cooldown_days * 86400}:R>",
                         ephemeral=True,
                     )
                 db.reference(db_cooldown_path).child(key).delete()

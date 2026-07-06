@@ -23,6 +23,16 @@ async def check_for_manager(interaction):
         return False
     return True
 
+async def check_for_admin(interaction):
+    server_config = ROLE_IDS.get(interaction.guild.id)
+    roles_map = server_config["roles"]
+    allowed_keys = ["owner", "executive", "manager", "admin"]
+    allowed_role_ids = {int(roles_map[key]) for key in allowed_keys if key in roles_map}
+    user_role_ids = {role.id for role in interaction.user.roles}
+    if not user_role_ids.intersection(allowed_role_ids):
+        return False
+    return True
+
 def check_for_staff(guild: discord.Guild, member: discord.Member) -> bool:
     if guild.id not in ROLE_IDS:
         return False

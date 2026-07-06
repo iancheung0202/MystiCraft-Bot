@@ -9,7 +9,7 @@ from firebase_admin import db
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
-from commands.Tickets.tickets import check_for_manager
+from commands.Tickets.tickets import check_for_manager, check_for_admin
 from commands.Utility.loa import HistoryPageView
 from constants import CATEGORY_IDS, CATEGORY_EMOJIS_MAP, SERVER_IDS, ROLE_IDS
 
@@ -866,9 +866,9 @@ class StatsCommand(commands.GroupCog, name="stats"):
 
     @app_commands.command(name="tickets", description="Show the staff ticket leaderboard")
     async def stats_tickets(self, interaction: discord.Interaction) -> None:
-        if not await check_for_manager(interaction):
+        if not await check_for_admin(interaction):
             return await interaction.response.send_message(
-                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} You need Manager+ permissions to use this command."),
+                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} You need Admin+ permissions to use this command."),
                 ephemeral=True,
             )
         await interaction.response.defer(ephemeral=True)
@@ -887,9 +887,9 @@ class StatsCommand(commands.GroupCog, name="stats"):
 
     @app_commands.command(name="testers", description="Show the tierlist tester leaderboard")
     async def stats_testers(self, interaction: discord.Interaction) -> None:
-        if not await check_for_manager(interaction):
+        if not await check_for_admin(interaction):
             return await interaction.response.send_message(
-                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} You need Manager+ permissions to use this command."),
+                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} You need Admin+ permissions to use this command."),
                 ephemeral=True,
             )
         await interaction.response.defer(ephemeral=True)
@@ -908,9 +908,9 @@ class StatsCommand(commands.GroupCog, name="stats"):
 
     @app_commands.command(name="punishments", description="Show the punishment log leaderboard")
     async def stats_punishments(self, interaction: discord.Interaction) -> None:
-        if not await check_for_manager(interaction):
+        if not await check_for_admin(interaction):
             return await interaction.response.send_message(
-                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} You need Manager+ permissions to use this command."),
+                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} You need Admin+ permissions to use this command."),
                 ephemeral=True,
             )
         await interaction.response.defer(ephemeral=True)
@@ -932,9 +932,9 @@ class StatsCommand(commands.GroupCog, name="stats"):
 
     @app_commands.command(name="appeals", description="Show the appeal actions leaderboard")
     async def stats_appeals(self, interaction: discord.Interaction) -> None:
-        if not await check_for_manager(interaction):
+        if not await check_for_admin(interaction):
             return await interaction.response.send_message(
-                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} You need Manager+ permissions to use this command."),
+                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} You need Admin+ permissions to use this command."),
                 ephemeral=True,
             )
         await interaction.response.defer(ephemeral=True)
@@ -960,9 +960,9 @@ class StatsCommand(commands.GroupCog, name="stats"):
 
     @app_commands.command(name="checkup", description="Generate weekly checkups for all staff members")
     async def stats_checkup(self, interaction: discord.Interaction) -> None:
-        if not await check_for_manager(interaction):
+        if not await check_for_admin(interaction):
             return await interaction.response.send_message(
-                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} You need Manager+ permissions to use this command."),
+                embed=embed_error("Permission Denied", f"{EMOJI_BARRIER} You need Admin+ permissions to use this command."),
                 ephemeral=True,
             )
         await interaction.response.defer(thinking=True, ephemeral=True)

@@ -940,17 +940,55 @@ class WaitlistCmd(commands.GroupCog, name="waitlist"):
         embed.set_field_at(1, name="Currently Serving", value=new_active_str, inline=False)
         await oldMessage.edit(embed=embed)
         # Try to remove user from thread if present
+        thread_removed = False
+        thread_error = None
         try:
-            if interaction.channel and interaction.channel.type.name == "public_thread":
+            if interaction.channel and interaction.channel.type.name in ("public_thread", "private_thread"):
                 await interaction.channel.remove_user(user)
+                thread_removed = True
             else:
-                # Try to find a thread in the channel where user is a member
+                target_thread = None
                 for thread in gamemodeChannel.threads:
-                    if user in thread.members and f"{user.id}" in thread.name:
-                        await thread.remove_user(user)
-        except Exception:
-            pass
-        await interaction.followup.send(f"<:checkmark:1339153448926580818> {user.mention} has been skipped and removed from the active slot.", ephemeral=True)
+                    if f"{user.id}" in thread.name:
+                        target_thread = thread
+                        break
+                if target_thread is None:
+                    try:
+                        async for thread in gamemodeChannel.archived_threads(limit=100):
+                            if f"{user.id}" in thread.name:
+                                target_thread = thread
+                                break
+                    except Exception:
+                        pass
+                if target_thread is None:
+                    try:
+                        async for thread in gamemodeChannel.archived_threads(private=True, limit=100):
+                            if f"{user.id}" in thread.name:
+                                target_thread = thread
+                                break
+                    except Exception:
+                        pass
+                if target_thread is not None:
+                    if target_thread.archived:
+                        await target_thread.edit(archived=False)
+                    await target_thread.remove_user(user)
+                    thread_removed = True
+        except Exception as e:
+            thread_error = e
+        if thread_error is not None:
+            await interaction.followup.send(
+                f"<:checkmark:1339153448926580818> {user.mention} has been skipped and removed from the Serving slot.\n"
+                f"<:warn:1459986909911842846> Could not remove them from their ticket thread: {thread_error}",
+                ephemeral=True,
+            )
+        elif not thread_removed:
+            await interaction.followup.send(
+                f"<:checkmark:1339153448926580818> {user.mention} has been skipped and removed from the Serving slot.\n"
+                f"<:warn:1459986909911842846> No matching ticket thread was found to remove them from.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.followup.send(f"<:checkmark:1339153448926580818> {user.mention} has been skipped, removed from the Serving slot, and kicked from the thread.", ephemeral=True)
 
     @app_commands.command(
         name="results", description="Finalize a user's waitlist result"
@@ -1586,8 +1624,8 @@ class WaitlistCmd(commands.GroupCog, name="waitlist"):
         has_linked = nextMember and ROLE_IDS[SERVER_IDS["tierlist"]]["linked"] in [role.id for role in nextMember.roles]
         display_ign = linked_ign if linked_ign != "None" else "Not Linked"
 
-        embed = discord.Embed(title=f"Testing Session for {nextMember.name if nextMember else str(nextID)}", description="> **Reminder for testers:** Verify the player's Minecraft account matches the one below before testing. If they changed their name, ask the player to [link](https://ptb.discord.com/channels/1304829305443844096/1460525451368861818) their accounts again.", color=discord.Colour.blue())
-        embed.add_field(name="Linked IGN", value=f"[{display_ign}](https://tierlist.mysticraft.xyz/?player={display_ign})" if has_linked else "<:no:1036810470860013639> Not Linked", inline=True)
+        embed = discord.Embed(title=f"Testing Session for {nextMember.name if nextMember else str(nextID)}", description="> **Reminder for testers:** Verify the player's Minecraft account matches the one below before testing. If they changed their name, ask the player to [link](https://discord.com/channels/1304829305443844096/1460525451368861818) their accounts again.", color=discord.Colour.blue())
+        embed.add_field(name="Linked IGN", value=f"[{display_ign}](https://tierlist.mysticraft.xyz/?player={display_ign})" if has_linked and display_ign != "Not Linked" else "<:no:1036810470860013639> Not Linked", inline=True)
         embed.add_field(name="Current Rank", value=current_rank, inline=True)
         embed.add_field(name="Region", value=recorded_region, inline=True)
         embed.set_footer(text=f"These details are based on the user's database records.")
