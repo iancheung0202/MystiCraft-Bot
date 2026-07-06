@@ -521,15 +521,14 @@ class Ticket(commands.GroupCog, name="ticket"):
     async def ticket_add(self, interaction: discord.Interaction, user: discord.Member):
         guild, channel = interaction.guild, interaction.channel
 
-        if not channel.topic or not channel.topic.isdigit():
+        ticket_owner_id = get_ticket_owner_id(channel)
+        if ticket_owner_id is None:
             embed = discord.Embed(description="❌ This command can only be used in ticket channels.", color=0xFF0000)
             return await interaction.response.send_message(embed=embed, ephemeral=True)
-        
+
         if not check_for_staff(guild, interaction.user):
             embed = discord.Embed(description="You cannot run this command as you do not have permission to manage tickets.", color=0xFF0000)
             return await interaction.response.send_message(embed=embed, ephemeral=True)
-        
-        ticket_owner_id = int(channel.topic)
         if user.id == ticket_owner_id:
             embed = discord.Embed(description="❌ This user is the ticket owner and already has access to this channel.", color=0xFF0000)
             return await interaction.response.send_message(embed=embed, ephemeral=True)
