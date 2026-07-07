@@ -274,14 +274,14 @@ class AcceptRejectButton(discord.ui.View):
         if "staff" in interaction.message.embeds[0].title.lower():
             embed = discord.Embed(
                 title="You are rejected! :pensive:",
-                description="Thank you so much for applying for staff. We receive numerous incredible applications every single day and unfortunately, we aren't able to accept you at this time. \n\nWe are unable to give everyone who applies a specific reason for denial, but do note that the review process is a separate, manual process done one-by-one by our management team with the server owner. During the review process, there are a lot of factors that get considered for each application. \n\nDon't fret - you're always welcome to reapply in the future. In order to reapply, you'll have to wait 30 days from today. Applications sent from you during the waiting period will be ignored.\n\nOnce again, due to the high volume of applications, we're currently unable to provide any more details or specifics about the nature of your application. We really hope you're not too discouraged by the news, and remember; this decision in no way speaks to the value, joy, and belonging you bring to your community every day.",
+                description="Thank you so much for applying for staff. We receive numerous incredible applications every single day and unfortunately, we aren't able to accept you at this time. \n\nWe are unable to give everyone who applies a specific reason for denial, but do note that the review process is a separate, manual process done one-by-one by our management team with the server owner. During the review process, there are a lot of factors that get considered for each application. \n\nDon't fret - you're always welcome to reapply in the future. In order to reapply, you'll have to wait 14 days from today. Applications sent from you during the waiting period will be ignored.\n\nOnce again, due to the high volume of applications, we're currently unable to provide any more details or specifics about the nature of your application. We really hope you're not too discouraged by the news, and remember; this decision in no way speaks to the value, joy, and belonging you bring to your community every day.",
                 color=0xFF0000,
             )
         else:
             app_type = "Media application" if interaction.guild.id == SERVER_IDS["support"] else "Tierlist Tester application"
             embed = discord.Embed(
                 title="You are rejected! :pensive:",
-                description=f"Thank you so much for submitting your {app_type}. Unfortunately, we aren't able to accept you at this time. \n\nWe are unable to give everyone who applies a specific reason for denial, but do note that the review process is a separate, manual process done one-by-one by our management team with the server owner. During the review process, there are a lot of factors that get considered for each application. \n\nDon't fret - you're always welcome to reapply in the future. In order to reapply, you'll have to wait 30 days from today. Applications sent from you during the waiting period will be ignored.\n\nWe really hope you're not too discouraged by the news, and remember; this decision in no way speaks to the value, joy, and belonging you bring to your community every day.",
+                description=f"Thank you so much for submitting your {app_type}. Unfortunately, we aren't able to accept you at this time. \n\nWe are unable to give everyone who applies a specific reason for denial, but do note that the review process is a separate, manual process done one-by-one by our management team with the server owner. During the review process, there are a lot of factors that get considered for each application. \n\nDon't fret - you're always welcome to reapply in the future. In order to reapply, you'll have to wait 14 days from today. Applications sent from you during the waiting period will be ignored.\n\nWe really hope you're not too discouraged by the news, and remember; this decision in no way speaks to the value, joy, and belonging you bring to your community every day.",
                 color=0xFF0000,
             )
             
@@ -388,7 +388,7 @@ class ApplicationView(discord.ui.View):
             db_cooldown_path = "/Staff App Cooldown" if is_staff else "/Media App Cooldown"
             category_key = "staff" if is_staff else "media"
             log_title = "Staff Application" if is_staff else "Media Application"
-            cooldown_days = 30
+            cooldown_days = 14
             
             if is_staff:
                 requirements = (
@@ -446,7 +446,7 @@ class ApplicationView(discord.ui.View):
             db_cooldown_path = "/Staff App Cooldown" if is_staff else "/Tester App Cooldown"
             category_key = "staff" if is_staff else "tester"
             log_title = "Tierlist Staff Application" if is_staff else "Tester Application"
-            cooldown_days = 30 if is_staff else 7
+            cooldown_days = 14 if is_staff else 7
             
             if is_staff:
                 requirements = (
@@ -696,7 +696,7 @@ class ApplicationView(discord.ui.View):
         )
         action_embed.add_field(
             name="Reject", 
-            value="-# DMs the user a warm rejection message, where they can reapply after 30 days.", 
+            value="-# DMs the user a warm rejection message, where they can reapply after 14 days.", 
             inline=True
         )
         action_embed.add_field(
