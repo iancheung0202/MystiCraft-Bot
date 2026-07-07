@@ -81,7 +81,8 @@ CATEGORY_IDS = {
         "punishment appeals": 1374959224752312362,
         "player reports": 1374959260458287125,
         "bug/glitch reports": 1374959285716647947,
-        "staff reports": 1374959273930391592
+        "staff reports": 1374959273930391592,
+        "priority": 1524105957737500864
     },
     SERVER_IDS["tierlist"]: {
         "general support": 1462026697024213024,
@@ -116,6 +117,13 @@ TICKET_COOLDOWNS = {
     "high_testing": 86400 * 30,  # 30 days
     "staff_app_tierlist": 86400 * 30,  # 30 days
 }
+
+PRIORITY_ROLE_IDS = [
+    1523960131174531152, # Patron+
+    1523959442570477568, # Patron
+    1141377845671764018, # Server Booster
+    1136672571442602024, # Donator
+]
 
 FLAG_CHANNEL_IDS = {
     "owner": {

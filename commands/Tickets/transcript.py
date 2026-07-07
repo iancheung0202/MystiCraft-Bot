@@ -1,15 +1,17 @@
 import re
 import aiohttp
+import os
 
 from groq import Groq
 
 
 async def generate(prompt):
-    client = Groq(api_key="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")
+    client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
     chat_completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model="llama-3.1-8b-instant",
+        model="openai/gpt-oss-20b",
+        reasoning_effort="medium",
     )
 
     return chat_completion.choices[0].message.content

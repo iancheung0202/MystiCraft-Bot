@@ -9,7 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ui import Button, View
 
-from constants import ROLE_IDS, SERVER_IDS, CATEGORY_IDS, TICKET_COOLDOWNS, FLAG_CHANNEL_IDS, SUPPORT_ROLE_IDS, LOG_CHANNEL_IDS, COOLDOWN_BYPASS_USER_IDS
+from constants import ROLE_IDS, SERVER_IDS, CATEGORY_IDS, TICKET_COOLDOWNS, FLAG_CHANNEL_IDS, SUPPORT_ROLE_IDS, LOG_CHANNEL_IDS, COOLDOWN_BYPASS_USER_IDS, PRIORITY_ROLE_IDS
 from commands.Tickets.maintenance import delete_flags, close_ticket
 
 
@@ -116,6 +116,18 @@ class CreateTicketButton(discord.ui.Button):
             )
             error_embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
             return await interaction.response.send_message(embed=error_embed, ephemeral=True)
+        
+        # Priority ticket check for support server only
+        if guild_id == SERVER_IDS["support"]:
+            main_guild = interaction.client.get_guild(SERVER_IDS["main"])
+            main_member = main_guild.get_member(interaction.user.id) if main_guild else None
+            if main_guild and not main_member:
+                try:
+                    main_member = await main_guild.fetch_member(interaction.user.id)
+                except discord.NotFound:
+                    main_member = None
+            if main_member and any(role.id in PRIORITY_ROLE_IDS for role in main_member.roles):
+                category_id = CATEGORY_IDS[SERVER_IDS["support"]]["priority"]
 
         category_channel = interaction.guild.get_channel(category_id)
 

@@ -278,7 +278,7 @@ class AcceptRejectButton(discord.ui.View):
                 color=0xFF0000,
             )
         else:
-            app_type = "media application" if interaction.guild.id == SERVER_IDS["support"] else "tierlist tester application"
+            app_type = "Media application" if interaction.guild.id == SERVER_IDS["support"] else "Tierlist Tester application"
             embed = discord.Embed(
                 title="You are rejected! :pensive:",
                 description=f"Thank you so much for submitting your {app_type}. Unfortunately, we aren't able to accept you at this time. \n\nWe are unable to give everyone who applies a specific reason for denial, but do note that the review process is a separate, manual process done one-by-one by our management team with the server owner. During the review process, there are a lot of factors that get considered for each application. \n\nDon't fret - you're always welcome to reapply in the future. In order to reapply, you'll have to wait 30 days from today. Applications sent from you during the waiting period will be ignored.\n\nWe really hope you're not too discouraged by the news, and remember; this decision in no way speaks to the value, joy, and belonging you bring to your community every day.",
@@ -301,7 +301,7 @@ class AcceptRejectButton(discord.ui.View):
         if not await check_for_admin(interaction):    
             return await interaction.response.send_message("❌ You don't have permission to use this button.", ephemeral=True)
         user = interaction.guild.get_member(int(interaction.message.embeds[0].description.split("`")[1]))
-        application = "staff application" if "staff" in interaction.message.embeds[0].title.lower() else "media application"
+        application = "Staff Application" if "staff" in interaction.message.embeds[0].title.lower() else "Media Application"
         await interaction.channel.set_permissions(user, send_messages=True, read_messages=True, attach_files=True)
         
         embed = discord.Embed(
