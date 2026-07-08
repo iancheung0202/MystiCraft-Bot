@@ -48,7 +48,7 @@ class MystiCraft(commands.Bot):
         )
 
     async def setup_hook(self):
-        bot.chatgames_pool = await asyncpg.create_pool(
+        bot.pool = await asyncpg.create_pool(
             database=os.environ.get("POSTGRESQL_DATABASE_NAME"),
             user=os.environ.get("POSTGRESQL_DATABASE_USER"),
             password=os.environ.get("POSTGRESQL_DATABASE_PASSWORD"),
