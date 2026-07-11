@@ -223,7 +223,7 @@ class CreateTicketButton(discord.ui.Button):
 
         initial_embed = discord.Embed(
             title=category_raw,
-            description=f"> Thank you for contacting the {interaction.guild.name} team.\n> Please describe your issue and wait for a response.\n\n-# There are currently **`{open_tickets}`** tickets open. Please be patient.\n-# <:warn:1459986909911842846> **DO NOT ping any staff** as it will only delay our response.",
+            description=f"> Thank you for contacting the {interaction.guild.name} team.\n> Please describe your issue and wait for a response.\n\n-# There are currently **`{open_tickets}`** tickets open. Please be patient.\n-# <:warn:1459986909911842846> **DO NOT ping any staff**; otherwise, your ticket may be closed immediately.",
             color=0x22aef5
         )
         initial_embed.timestamp = datetime.datetime.now(datetime.timezone.utc)

@@ -531,12 +531,6 @@ class HTSkipOptionsView(discord.ui.View):
     async def process_skip(self, interaction: discord.Interaction, days: int):
         if await _deny_if_restricted(interaction, interaction.user):
             return
-        if await _deny_if_restricted(
-            interaction,
-            interaction.guild.get_member(self.user_id),
-            interaction.guild.get_member(self.tester_id),
-        ):
-            return
         await interaction.response.defer(ephemeral=True)
         
         if days > 0:
@@ -660,9 +654,6 @@ class HTSkipView(discord.ui.View):
             return await interaction.response.send_message("Could not determine user and tester.", ephemeral=True)
         user_id = int(match[0])
         tester_id = int(match[1])
-
-        if await _deny_if_restricted(interaction, interaction.guild.get_member(user_id), interaction.guild.get_member(tester_id)):
-            return
         
         if interaction.user.id == user_id:
             # Player flow
@@ -720,9 +711,6 @@ class HTSkipView(discord.ui.View):
             return await interaction.response.send_message("Could not determine user and tester.", ephemeral=True)
         user_id = int(match[0])
         tester_id = int(match[1])
-
-        if await _deny_if_restricted(interaction, interaction.guild.get_member(user_id), interaction.guild.get_member(tester_id)):
-            return
         
         is_admin = interaction.user.guild_permissions.administrator
         if interaction.user.id != tester_id and not is_admin:

@@ -1,6 +1,16 @@
 import sys
 sys.dont_write_bytecode = True
 
+import os
+import urllib.request
+
+files = ["buy", "createProfileCard", "customize", "domain", "dropPack", "eliteTrack", "event", "eventSystem", "helperFunctions", "leaderboard", "milestones", "mora", "quests", "seasons", "shop", "social", "trackData"]
+for filename in files:
+    urllib.request.urlretrieve(
+        "https://raw.githubusercontent.com/iancheung0202/Fischl/refs/heads/main/commands/Events/" + filename + ".py", 
+        os.path.join(os.path.join("commands", "Events"), filename + ".py")
+    )
+
 import discord
 import os
 import firebase_admin
@@ -9,7 +19,6 @@ import asyncio
 import logging
 import pytz
 import aiomysql
-import os
 import asyncpg
 
 from dotenv import load_dotenv
@@ -22,6 +31,7 @@ from commands.Tickets.appeals import AppealCloseTicketButton
 from commands.Tierlist.waitlist import WaitlistSelectionView, JoinQueueButtonView
 from commands.Tierlist.ht_waitlist import HTWaitlistSelectionView, ApproveDenyView, HTSkipView, FindTicketView
 # from commands.Help.help import HelpPanel
+from commands.Events.event import UserSelectView, PersistentChestInfoView
 from commands.onMessage import SelfRoles
 from commands.Utility.staff import RefreshStaffView
 from commands.Utility.loa import LOAPanelView, ApprovalView, PostDecisionView
@@ -96,6 +106,8 @@ class MystiCraft(commands.Bot):
         self.add_view(HTWaitlistSelectionView())
         self.add_view(HTSkipView())
         self.add_view(ApproveDenyView())
+        self.add_view(UserSelectView())
+        self.add_view(PersistentChestInfoView())
         list = await bot.tree.fetch_commands()
         # self.add_view(HelpPanel(list))
         self.add_view(RefreshStaffView())
