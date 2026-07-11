@@ -28,7 +28,7 @@ from firebase_admin import credentials
 from commands.Tickets.tickets import CloseTicketButton, TicketAdminButtons, CreateTicketButtonView, ResolveFlagView, SelectView
 from commands.Tickets.application import ApplicationDelete, AcceptRejectButton, ApplicationView 
 from commands.Tickets.appeals import AppealCloseTicketButton
-from commands.Tierlist.waitlist import WaitlistSelectionView, JoinQueueButtonView
+from commands.Tierlist.waitlist import WaitlistSelectionView
 from commands.Tierlist.ht_waitlist import HTWaitlistSelectionView, ApproveDenyView, HTSkipView, FindTicketView
 # from commands.Help.help import HelpPanel
 from commands.Events.event import UserSelectView, PersistentChestInfoView
@@ -102,7 +102,6 @@ class MystiCraft(commands.Bot):
         self.add_view(ResolveFlagView())
         self.add_view(SelectView())
         self.add_view(WaitlistSelectionView())
-        self.add_view(JoinQueueButtonView())
         self.add_view(HTWaitlistSelectionView())
         self.add_view(HTSkipView())
         self.add_view(ApproveDenyView())
