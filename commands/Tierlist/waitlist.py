@@ -133,6 +133,7 @@ def return_item(obj):
 
 AUTHORIZED_USERS = [692254240290242601, 840972960793100309]
 LINKED_LOG_CHANNEL_ID = 1460005738897473706
+QUEUE_LOG_CHANNEL_ID = 1525755266614956123
 RESTRICTED_ROLE_ID = 1340417478857068564
 
 TIER_ROLE_PREFIXES = {"HT1", "LT1", "HT2", "LT2", "HT3", "LT3", "HT4", "LT4", "HT5", "LT5"}
@@ -305,6 +306,18 @@ class QueueManager:
         self.last_hash = None # track last synced state to detect changes
         self.last_closed_time = None # track when queue was last closed
         self.is_open = False # track whether the queue is currently open (no embed check needed)
+        self.opened_by = None
+        self.opened_at = 0
+        self.region = None
+        self.tester_stats: Dict[int, dict] = {}
+        self.joined_ids: set[int] = set()
+        self.leave_ids: set[int] = set()
+        self.last_next_time: int = 0
+        self.total_test_duration: int = 0
+        self.total_wait_duration: int = 0
+        self.booster_ids: set[int] = set()
+        self.boosters_tested: set[int] = set()
+        self.peak_length = 0
     
     async def start_worker(self):
         if self.worker_task is None:
@@ -361,9 +374,15 @@ class QueueManager:
             self.queue.insert(last_booster_idx + 1, entry)
         else:
             self.queue.append(entry)
+        self.joined_ids.add(op.user_id)
+        if op.is_booster:
+            self.booster_ids.add(op.user_id)
+        if len(self.queue) > self.peak_length:
+            self.peak_length = len(self.queue)
 
     async def handle_leave(self, op: QueueOperation):
         self.queue = [e for e in self.queue if e.user_id != op.user_id]
+        self.leave_ids.add(op.user_id)
     
     def get_hash(self) -> str:
         queue_str = "|".join([str(e.user_id) for e in self.queue])
@@ -444,12 +463,91 @@ class QueueManager:
     def clear_active_sessions(self):
         self.active_sessions.clear()
     
+    def reset_tracking(self):
+        self.opened_by = None
+        self.opened_at = 0
+        self.region = None
+        self.tester_stats.clear()
+        self.joined_ids.clear()
+        self.leave_ids.clear()
+        self.last_next_time = 0
+        self.total_test_duration = 0
+        self.total_wait_duration = 0
+        self.booster_ids.clear()
+        self.boosters_tested.clear()
+        self.peak_length = 0
+
+    async def send_start_log(self, tester_id: int, gamemode: str, region: str, carryover: int = 0):
+        channel = self.bot.get_channel(QUEUE_LOG_CHANNEL_ID)
+        if not channel:
+            return
+        embed = discord.Embed(
+            title=f"{EMOJI_EMERALD} Queue Opened",
+            color=discord.Color.green(),
+        )
+        embed.add_field(name="Opened by", value=f"-# <@{tester_id}>", inline=True)
+        embed.add_field(name="Gamemode", value=f"-# {GAMEMODE_DISPLAY.get(gamemode, gamemode)}", inline=True)
+        embed.add_field(name="Region", value=f"-# {region}", inline=True)
+        embed.add_field(name="Opened", value=f"-# <t:{int(time.time())}:R>", inline=True)
+        if carryover:
+            embed.add_field(name="Carried Over", value=f"`{carryover}` player{'' if carryover <= 1 else 's'}", inline=True)
+        await channel.send(embed=embed)
+
+    async def send_end_log(self, closer_id: int, gamemode: str, queue_length_at_close: int = 0):
+        channel = self.bot.get_channel(QUEUE_LOG_CHANNEL_ID)
+        if not channel:
+            return
+        duration = int(time.time()) - self.opened_at
+        duration_str = f"{duration // 60}m {duration % 60}s"
+
+        total_next = sum(s["next"] for s in self.tester_stats.values())
+        total_skipped = sum(s["skipped"] for s in self.tester_stats.values())
+        total_results = sum(s["results"] for s in self.tester_stats.values())
+
+        avg_test_str = "N/A"
+        if total_next > 1 and self.total_test_duration > 0:
+            avg_sec = self.total_test_duration // (total_next - 1)
+            avg_test_str = f"{avg_sec // 60}m {avg_sec % 60}s"
+
+        avg_wait_str = "N/A"
+        if total_next > 0 and self.total_wait_duration > 0:
+            avg_sec = self.total_wait_duration // total_next
+            avg_wait_str = f"{avg_sec // 60}m {avg_sec % 60}s"
+
+        embed = discord.Embed(
+            title=f"{EMOJI_BARRIER} Queue Closed",
+            color=discord.Color.red(),
+        )
+        embed.add_field(name="Opened by", value=f"-# <@{self.opened_by}>" if self.opened_by else "Unknown", inline=True)
+        embed.add_field(name="Closed by", value=f"-# <@{closer_id}>", inline=True)
+        embed.add_field(name="Gamemode", value=f"-# {GAMEMODE_DISPLAY.get(gamemode, gamemode)}", inline=True)
+        embed.add_field(name="Region", value=f"-# {self.region or "Unknown"}", inline=True)
+        embed.add_field(name="Closed", value=f"-# <t:{int(time.time())}:R>", inline=True)
+        embed.add_field(name="Duration", value=f"-# **{duration_str}**", inline=True)
+        embed.add_field(name="Total Joined", value=f"-# `{len(self.joined_ids)}` player{'' if len(self.joined_ids) <= 1 else 's'}", inline=True)
+        embed.add_field(name="Total Left", value=f"-# `{len(self.leave_ids)}` player{'' if len(self.leave_ids) <= 1 else 's'}", inline=True)
+        embed.add_field(name="Queue Peak", value=f"-# `{self.peak_length}` player{'' if self.peak_length <= 1 else 's'}", inline=True)
+        embed.add_field(name="Boosters Joined", value=f"-# `{len(self.booster_ids)}` booster{'' if len(self.booster_ids) <= 1 else 's'}", inline=True)
+        embed.add_field(name="Boosters Tested", value=f"-# `{len(self.boosters_tested)}` booster{'' if len(self.boosters_tested) <= 1 else 's'}", inline=True)
+        embed.add_field(name="Queue at Close", value=f"-# `{queue_length_at_close}` player{'' if queue_length_at_close <= 1 else 's'}", inline=True)
+        embed.add_field(name="Average Wait Time", value=f"-# `{avg_wait_str}` per player", inline=True)
+        embed.add_field(name="Average Test Time", value=f"-# `{avg_test_str}` per test", inline=True)
+
+        if self.tester_stats:
+            lines = [f"-# **Total:** Called: `{total_next}` | Skipped: `{total_skipped}` | Results: `{total_results}`"]
+            for tid, s in sorted(self.tester_stats.items()):
+                lines.append(f"-# {EMOJI_REPLY} <@{tid}> - Called: `{s['next']}` | Skipped: `{s['skipped']}` | Results: `{s['results']}`")
+            embed.add_field(name=f"{EMOJI_SCROLL} Testing Breakdown", value="\n".join(lines), inline=False)
+
+        await channel.send(embed=embed)
+
     def clear(self):
         self.queue.clear()
         self.active_sessions.clear()
         self.last_hash = None
         self.last_closed_time = None
         self.is_open = False
+        self.reset_tracking()
 
 
 class QueueManagerPool:
@@ -740,6 +838,14 @@ class QueuePanelView(discord.ui.LayoutView):
                 ),
                 ephemeral=True,
             )
+        tid = interaction.user.id
+        qm_stats = queue_manager.tester_stats.setdefault(tid, {"next": 0, "skipped": 0, "results": 0})
+        qm_stats["next"] += 1
+        now = int(time.time())
+        queue_manager.total_wait_duration += now - next_entry.join_time
+        if queue_manager.last_next_time:
+            queue_manager.total_test_duration += now - queue_manager.last_next_time
+        queue_manager.last_next_time = now
         next_id = next_entry.user_id
         next_member = interaction.guild.get_member(next_id)
         if next_member is None:
@@ -781,7 +887,7 @@ class QueuePanelView(discord.ui.LayoutView):
                 async with conn.cursor() as cursor:
                     await cursor.execute(
                         "SELECT region FROM tlresults WHERE player_user_id = %s AND gamemode = %s ORDER BY timestamp DESC LIMIT 1",
-                        (next_id, self.gamemode.upper()),
+                        (next_id, GAMEMODE_DISPLAY.get(self.gamemode.lower(), self.gamemode.upper())),
                     )
                     row = await cursor.fetchone()
                     if row:
@@ -848,9 +954,12 @@ class QueuePanelView(discord.ui.LayoutView):
             )
         old = messages[0]
         self.queue_manager.mark_closed()
+        queue_length_at_close = len(self.queue_manager.queue)
         container = build_queue_container(gamemode=self.gamemode, queue=self.queue_manager.queue.copy(), active_sessions=self.queue_manager.active_sessions.copy(), is_open=False, ping_role_id=item[0])
         closed_view = QueuePanelView(gamemode=self.gamemode, queue_manager=self.queue_manager, bot=self.bot, is_open=False, container=container)
         await old.edit(view=closed_view)
+        await self.queue_manager.send_end_log(interaction.user.id, self.gamemode, queue_length_at_close)
+        self.queue_manager.reset_tracking()
         await interaction.response.edit_message(
             embed=discord.Embed(
                 description=f"{CHECK} Queue closed and positions preserved for a quick reopen within 10 minutes.",
@@ -992,7 +1101,12 @@ class RegionSelectView(discord.ui.View):
             qm.clear_active_sessions()
             if qm.should_clear_on_start():
                 qm.clear()
+            carryover = len(qm.queue)
             qm.is_open = True
+            qm.reset_tracking()
+            qm.opened_by = interaction.user.id
+            qm.opened_at = int(time.time())
+            qm.region = region
 
             container = build_queue_container(
                 gamemode=self.gamemode,
@@ -1010,6 +1124,7 @@ class RegionSelectView(discord.ui.View):
             )
             new_msg = await gamemode_channel.send(view=panel)
             qm.set_message_location(channel_id, new_msg.id)
+            await qm.send_start_log(interaction.user.id, self.gamemode, region, carryover)
             await interaction.response.edit_message(
                 embed=discord.Embed(
                     description=f"{CHECK} You've opened the **{GAMEMODE_DISPLAY.get(self.gamemode, self.gamemode)}** queue for **{region}**.",
@@ -1186,6 +1301,7 @@ class ThreadActionsView(discord.ui.LayoutView):
 
         qm = interaction.client.queue_manager_pool.get_manager(gamemode)
         qm.remove_active_session(member.id)
+        qm.tester_stats.setdefault(interaction.user.id, {"next": 0, "skipped": 0, "results": 0})["skipped"] += 1
 
         thread = interaction.channel
         try:
@@ -1352,7 +1468,7 @@ class ThreadActionsView(discord.ui.LayoutView):
                 async with conn.cursor() as cursor:
                     await cursor.execute(
                         "SELECT region FROM tlresults WHERE player_user_id = %s AND gamemode = %s ORDER BY timestamp DESC LIMIT 1",
-                        (member.id, gamemode.upper()),
+                        (member.id, GAMEMODE_DISPLAY.get(gamemode.lower(), gamemode.upper())),
                     )
                     row = await cursor.fetchone()
                     if row:
@@ -1444,7 +1560,7 @@ class ResultsModal(discord.ui.Modal):
 
         await interaction.response.defer()
 
-        gamemode = self.gamemode.upper()
+        gamemode = GAMEMODE_DISPLAY.get(self.gamemode.lower(), self.gamemode.upper())
         member = self.member
         user = member if member else None
         if ROLE_IDS[SERVER_IDS["tierlist"]]["linked"] not in [r.id for r in user.roles]:
@@ -1662,6 +1778,9 @@ class ResultsModal(discord.ui.Modal):
             self.queue_manager.remove_active_session(user.id)
         except Exception as e:
             print(f"Queue Sync Error: {e}")
+        self.queue_manager.tester_stats.setdefault(self.tester.id, {"next": 0, "skipped": 0, "results": 0})["results"] += 1
+        if member and member.id in self.queue_manager.booster_ids:
+            self.queue_manager.boosters_tested.add(member.id)
 
 
 class HistoryPaginationView(discord.ui.View):
