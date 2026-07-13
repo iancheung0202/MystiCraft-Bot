@@ -42,6 +42,7 @@ EMOJI_CRYSTAL       = "<:crystal:1518050761010057290>"
 EMOJI_BOOSTER       = "<:Booster_Logo:1154871576047657051>"
 EMOJI_STATS         = "<:stats:1523014008490426468>"
 EMOJI_LINK          = "<:link:1523013738234642462>"
+EMOJI_DOT           = "<:dot:1357188726047899760>"
 
 CROSS = "<:cross1:1339153202859474956>"
 CHECK = "<:checkmark:1339153448926580818>"
@@ -277,7 +278,10 @@ class QueueEntry:
         self.ign = ign
 
     def to_string(self, position: int) -> str:
-        display = f"{self.mention} (joined <t:{self.join_time}:R>)"
+        link = ""
+        if self.ign and self.ign != "None":
+            link = f" — {EMOJI_STEVE} [{self.ign}](https://tierlist.mysticraft.xyz/?player={self.ign})"
+        display = f"{self.mention}{link} *(joined <t:{self.join_time}:R>)*"
         if self.is_booster:
             display += f" {BOOSTER_EMOJI}"
         return f"{position}. {display}"
@@ -452,8 +456,8 @@ class QueueManager:
     def set_active_sessions(self, sessions: Dict[int, dict]):
         self.active_sessions = sessions.copy()
     
-    def add_active_session(self, member_id: int, tester_id: int, thread_url: str = "", started_at: int = None):
-        self.active_sessions[member_id] = {"tester_id": tester_id, "thread_url": thread_url, "started_at": started_at if started_at is not None else int(time.time())}
+    def add_active_session(self, member_id: int, tester_id: int, thread_url: str = "", started_at: int = None, ign: str = None):
+        self.active_sessions[member_id] = {"tester_id": tester_id, "thread_url": thread_url, "started_at": started_at if started_at is not None else int(time.time()), "ign": ign}
     
     def remove_active_session(self, member_id: int):
         if member_id in self.active_sessions:
@@ -688,52 +692,36 @@ def build_queue_container(gamemode: str, queue: list, active_sessions: dict, is_
         attrs["sep0"] = discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.large)
 
         total = len(queue)
-        attrs["queue_header"] = discord.ui.TextDisplay(
-            f"### {EMOJI_COMPASS} Queue ({total} player{'s' if total != 1 else ''})"
-        )
+        queue_lines = []
         if queue:
-            for i, entry in enumerate(queue[:15]):
-                display = entry.to_string(i + 1)
-                ign = entry.ign
-                if ign and ign != "None":
-                    attrs[f"entry_{i}"] = discord.ui.Section(
-                        display,
-                        accessory=discord.ui.Button(label=f"{ign}", emoji=EMOJI_STEVE, style=discord.ButtonStyle.link, url=f"https://tierlist.mysticraft.xyz/?player={ign}")
-                    )
-                else:
-                    attrs[f"entry_{i}"] = discord.ui.TextDisplay(display)
-            if total > 15:
-                attrs["overflow"] = discord.ui.TextDisplay(
-                    f"{EMOJI_REPLY} ... and {total - 15} more in queue"
-                )
+            for i, entry in enumerate(queue[:20]):
+                queue_lines.append(entry.to_string(i + 1))
+            if total > 20:
+                queue_lines.append(f"{EMOJI_REPLY} ... and {total - 20} more in queue")
+            queue_content = f"### {EMOJI_COMPASS} Queue ({total} player{'s' if total != 1 else ''})\n" + "\n".join(queue_lines)
         else:
-            attrs["empty"] = discord.ui.TextDisplay(
-                f"{EMOJI_HOURGLASS} Queue is empty - waiting for players to join!"
-            )
+            queue_content = f"### {EMOJI_COMPASS} Queue ({total} player{'s' if total != 1 else ''})\n{EMOJI_HOURGLASS} Queue is empty - waiting for players to join!"
+        attrs["queue_display"] = discord.ui.TextDisplay(queue_content)
 
         attrs["sep1"] = discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.large)
-        attrs["serving_header"] = discord.ui.TextDisplay(
-            f"### {EMOJI_SPYGLASS} Currently Testing"
-        )
+
+        session_lines = []
         if active_sessions:
             for i, (member_id, session) in enumerate(active_sessions.items(), 1):
                 tester_id = session["tester_id"]
                 thread_url = session.get("thread_url", "")
                 started_at = session.get("started_at", int(time.time()))
-                line = f"{i}. {EMOJI_STEVE} <@{member_id}> *(by <@{tester_id}> <t:{started_at}:R>)*"
-                if thread_url:
-                    attrs[f"session_{i}"] = discord.ui.Section(
-                        line,
-                        accessory=discord.ui.Button(label="Thread", emoji=EMOJI_LINK, style=discord.ButtonStyle.link, url=thread_url)
-                    )
-                else:
-                    attrs[f"session_{i}"] = discord.ui.TextDisplay(line)
+                ign = session.get("ign", "")
+                line = f"{i}. <@{member_id}>"
+                if ign and ign != "None":
+                    line += f" — {EMOJI_STEVE} [{ign}](https://tierlist.mysticraft.xyz/?player={ign})"
+                line += f" *(by <@{tester_id}> <t:{started_at}:R>)* [↗]({thread_url})"
+                session_lines.append(line)
+            session_content = f"### {EMOJI_SPYGLASS} Currently Testing\n" + "\n".join(session_lines)
         else:
-            attrs["no_session"] = discord.ui.TextDisplay(
-                f"{EMOJI_HOURGLASS} No active sessions"
-            )
+            session_content = f"### {EMOJI_SPYGLASS} Currently Testing\n{EMOJI_HOURGLASS} No active sessions"
+        attrs["session_display"] = discord.ui.TextDisplay(session_content)
     else:
-        attrs["instructions"] = discord.ui.TextDisplay(f"{NOT_OPEN_TEXT}{INSTRUCTIONS_TEXT}")
         attrs["sep0"] = discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.large)
         attrs["closed_msg"] = discord.ui.TextDisplay(
             f"{EMOJI_BARRIER} **Queue is closed.** No testers are currently available.\n"
@@ -885,7 +873,6 @@ class QueuePanelView(discord.ui.LayoutView):
                 ),
                 ephemeral=True,
             )
-        queue_manager.add_active_session(next_id, tester_id, thread.jump_url)
         linked_ign = "None"
         try:
             async with self.bot.tllink_pool.acquire() as conn:
@@ -902,6 +889,7 @@ class QueuePanelView(discord.ui.LayoutView):
                         linked_ign = link_res[0]
         except Exception as e:
             print(f"Error fetching IGN: {e}")
+        queue_manager.add_active_session(next_id, tester_id, thread.jump_url, ign=(linked_ign if linked_ign and linked_ign != "None" else None))
         region_str = f"{WARN} Unknown"
         try:
             async with self.bot.tlresults_pool.acquire() as conn:
