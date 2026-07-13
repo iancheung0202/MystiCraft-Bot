@@ -30,6 +30,7 @@ from commands.Tickets.application import ApplicationDelete, AcceptRejectButton, 
 from commands.Tickets.appeals import AppealCloseTicketButton
 from commands.Tierlist.waitlist import WaitlistSelectionView
 from commands.Tierlist.ht_waitlist import HTWaitlistSelectionView, ApproveDenyView, HTSkipView, FindTicketView
+from commands.Tierlist.ht_testing import HTTestingPanelView, HTActionView, HTApproveDenyView
 # from commands.Help.help import HelpPanel
 from commands.Events.event import UserSelectView, PersistentChestInfoView
 from commands.onMessage import SelfRoles
@@ -66,14 +67,6 @@ class MystiCraft(commands.Bot):
             port=int(os.environ.get("POSTGRESQL_DATABASE_PORT")), 
         )
 
-        for path, subdirs, files in os.walk("commands"):
-            for name in files:
-                if name.endswith(".py"):
-                    extension = os.path.join(path, name).replace("/", ".")[:-3]
-                    await self.load_extension(extension)
-                    print(f"Loaded {extension} in MystiCraft")
-        await bot.tree.sync()
-
         bot.tlresults_pool = await aiomysql.create_pool(
             host=os.getenv("DATABASE_HOST"),
             port=int(os.getenv("DATABASE_PORT")),
@@ -91,6 +84,14 @@ class MystiCraft(commands.Bot):
             db=os.getenv("TLLINK_DB_NAME"),
             autocommit=True
         )
+
+        for path, subdirs, files in os.walk("commands"):
+            for name in files:
+                if name.endswith(".py"):
+                    extension = os.path.join(path, name).replace("/", ".")[:-3]
+                    await self.load_extension(extension)
+                    print(f"Loaded {extension} in MystiCraft")
+        await bot.tree.sync()
 
         self.add_view(CloseTicketButton())
         self.add_view(TicketAdminButtons())
@@ -115,6 +116,9 @@ class MystiCraft(commands.Bot):
         self.add_view(AppealCloseTicketButton())
         self.add_view(RegistrationButtonView())
         self.add_view(FindTicketView())
+        self.add_view(HTTestingPanelView())
+        self.add_view(HTActionView())
+        self.add_view(HTApproveDenyView())
         self.add_view(LOAPanelView())
         self.add_view(ApprovalView())
         self.add_view(PostDecisionView())
