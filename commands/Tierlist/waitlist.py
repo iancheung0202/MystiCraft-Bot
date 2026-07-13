@@ -41,6 +41,7 @@ EMOJI_NETHERITE     = "<:netherite:1518477903568830524>"
 EMOJI_CRYSTAL       = "<:crystal:1518050761010057290>"
 EMOJI_BOOSTER       = "<:Booster_Logo:1154871576047657051>"
 EMOJI_STATS         = "<:stats:1523014008490426468>"
+EMOJI_LINK          = "<:link:1523013738234642462>"
 
 CROSS = "<:cross1:1339153202859474956>"
 CHECK = "<:checkmark:1339153448926580818>"
@@ -267,12 +268,13 @@ async def restrict(guild: discord.Guild, member: discord.Member):
 
 class QueueEntry:
     """Represents a single queue entry."""
-    def __init__(self, user_id: int, mention: str, username: str, is_booster: bool, join_time: int = None):
+    def __init__(self, user_id: int, mention: str, username: str, is_booster: bool, join_time: int = None, ign: str = None):
         self.user_id = user_id
         self.mention = mention
         self.username = username
         self.is_booster = is_booster
         self.join_time = join_time if join_time is not None else int(time.time())
+        self.ign = ign
 
     def to_string(self, position: int) -> str:
         display = f"{self.mention} (joined <t:{self.join_time}:R>)"
@@ -379,6 +381,13 @@ class QueueManager:
             self.booster_ids.add(op.user_id)
         if len(self.queue) > self.peak_length:
             self.peak_length = len(self.queue)
+        if entry.ign is None:
+            try:
+                ign = await fetch_ign(self.bot, op.user_id)
+                if ign:
+                    entry.ign = ign
+            except Exception:
+                pass
 
     async def handle_leave(self, op: QueueOperation):
         self.queue = [e for e in self.queue if e.user_id != op.user_id]
@@ -443,8 +452,8 @@ class QueueManager:
     def set_active_sessions(self, sessions: Dict[int, dict]):
         self.active_sessions = sessions.copy()
     
-    def add_active_session(self, member_id: int, tester_id: int, thread_url: str = ""):
-        self.active_sessions[member_id] = {"tester_id": tester_id, "thread_url": thread_url}
+    def add_active_session(self, member_id: int, tester_id: int, thread_url: str = "", started_at: int = None):
+        self.active_sessions[member_id] = {"tester_id": tester_id, "thread_url": thread_url, "started_at": started_at if started_at is not None else int(time.time())}
     
     def remove_active_session(self, member_id: int):
         if member_id in self.active_sessions:
@@ -521,9 +530,9 @@ class QueueManager:
         embed.add_field(name="Opened by", value=f"-# <@{self.opened_by}>" if self.opened_by else "Unknown", inline=True)
         embed.add_field(name="Closed by", value=f"-# <@{closer_id}>", inline=True)
         embed.add_field(name="Gamemode", value=f"-# {GAMEMODE_DISPLAY.get(gamemode, gamemode)}", inline=True)
-        embed.add_field(name="Region", value=f"-# {self.region or "Unknown"}", inline=True)
-        embed.add_field(name="Closed", value=f"-# <t:{int(time.time())}:R>", inline=True)
+        embed.add_field(name="Region", value=f"-# {self.region or 'Unknown'}", inline=True)
         embed.add_field(name="Duration", value=f"-# **{duration_str}**", inline=True)
+        embed.add_field(name="Closed", value=f"-# <t:{int(time.time())}:R>", inline=True)
         embed.add_field(name="Total Joined", value=f"-# `{len(self.joined_ids)}` player{'' if len(self.joined_ids) <= 1 else 's'}", inline=True)
         embed.add_field(name="Total Left", value=f"-# `{len(self.leave_ids)}` player{'' if len(self.leave_ids) <= 1 else 's'}", inline=True)
         embed.add_field(name="Queue Peak", value=f"-# `{self.peak_length}` player{'' if self.peak_length <= 1 else 's'}", inline=True)
@@ -536,8 +545,8 @@ class QueueManager:
         if self.tester_stats:
             lines = [f"-# **Total:** Called: `{total_next}` | Skipped: `{total_skipped}` | Results: `{total_results}`"]
             for tid, s in sorted(self.tester_stats.items()):
-                lines.append(f"-# {EMOJI_REPLY} <@{tid}> - Called: `{s['next']}` | Skipped: `{s['skipped']}` | Results: `{s['results']}`")
-            embed.add_field(name=f"{EMOJI_SCROLL} Testing Breakdown", value="\n".join(lines), inline=False)
+                lines.append(f"-# {EMOJI_REPLY}<@{tid}> - Called: `{s['next']}` | Skipped: `{s['skipped']}` | Results: `{s['results']}`")
+            embed.add_field(name=f"Testing Breakdown", value="\n".join(lines), inline=False)
 
         await channel.send(embed=embed)
 
@@ -685,7 +694,14 @@ def build_queue_container(gamemode: str, queue: list, active_sessions: dict, is_
         if queue:
             for i, entry in enumerate(queue[:15]):
                 display = entry.to_string(i + 1)
-                attrs[f"entry_{i}"] = discord.ui.TextDisplay(display)
+                ign = entry.ign
+                if ign and ign != "None":
+                    attrs[f"entry_{i}"] = discord.ui.Section(
+                        display,
+                        accessory=discord.ui.Button(label=f"{ign}", emoji=EMOJI_STEVE, style=discord.ButtonStyle.link, url=f"https://tierlist.mysticraft.xyz/?player={ign}")
+                    )
+                else:
+                    attrs[f"entry_{i}"] = discord.ui.TextDisplay(display)
             if total > 15:
                 attrs["overflow"] = discord.ui.TextDisplay(
                     f"{EMOJI_REPLY} ... and {total - 15} more in queue"
@@ -703,10 +719,15 @@ def build_queue_container(gamemode: str, queue: list, active_sessions: dict, is_
             for i, (member_id, session) in enumerate(active_sessions.items(), 1):
                 tester_id = session["tester_id"]
                 thread_url = session.get("thread_url", "")
-                url_suffix = f" [〚↗〛]({thread_url})" if thread_url else ""
-                attrs[f"session_{i}"] = discord.ui.TextDisplay(
-                    f"{i}. {EMOJI_STEVE} <@{member_id}> *(by <@{tester_id}>)*{url_suffix}"
-                )
+                started_at = session.get("started_at", int(time.time()))
+                line = f"{i}. {EMOJI_STEVE} <@{member_id}> *(by <@{tester_id}> <t:{started_at}:R>)*"
+                if thread_url:
+                    attrs[f"session_{i}"] = discord.ui.Section(
+                        line,
+                        accessory=discord.ui.Button(label="Thread", emoji=EMOJI_LINK, style=discord.ButtonStyle.link, url=thread_url)
+                    )
+                else:
+                    attrs[f"session_{i}"] = discord.ui.TextDisplay(line)
         else:
             attrs["no_session"] = discord.ui.TextDisplay(
                 f"{EMOJI_HOURGLASS} No active sessions"
@@ -916,7 +937,8 @@ class QueuePanelView(discord.ui.LayoutView):
         session_layout = discord.ui.LayoutView(timeout=None)
         session_layout.add_item(session_container)
         await thread.send(view=session_layout)
-        await thread.send(view=ThreadActionsView())
+        view_msg = await thread.send(view=ThreadActionsView())
+        await view_msg.pin()
 
     async def end_queue(self, interaction: discord.Interaction):
         if await deny_if_restricted(interaction, interaction.user):
@@ -940,12 +962,22 @@ class QueuePanelView(discord.ui.LayoutView):
         )
 
     async def confirm_end_queue(self, interaction: discord.Interaction):
+        if not self.queue_manager.is_open:
+            return await interaction.response.send_message(
+                embed=discord.Embed(
+                    description=f"{WARN} Queue is already closed.",
+                    color=discord.Color.orange()
+                ),
+                ephemeral=True,
+            )
+        await interaction.response.defer(ephemeral=True)
+
         item = return_item(self.gamemode)
         channel_id = item[1]
         gamemode_channel = interaction.guild.get_channel(channel_id)
         messages = [m async for m in gamemode_channel.history(limit=10) if m.author.id == interaction.client.application_id]
         if not messages:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 embed=discord.Embed(
                     description=f"{CROSS} No queue message found.",
                     color=discord.Color.red()
@@ -960,7 +992,7 @@ class QueuePanelView(discord.ui.LayoutView):
         await old.edit(view=closed_view)
         await self.queue_manager.send_end_log(interaction.user.id, self.gamemode, queue_length_at_close)
         self.queue_manager.reset_tracking()
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             embed=discord.Embed(
                 description=f"{CHECK} Queue closed and positions preserved for a quick reopen within 10 minutes.",
                 color=discord.Color.green()
@@ -1273,7 +1305,10 @@ class ThreadActionsView(discord.ui.LayoutView):
             )
         embed = discord.Embed(
             title=f"{EMOJI_GOLD_INGOT} Skip {member.name if member else 'Unknown'}?",
-            description=f"{EMOJI_REPLY} This will remove both of you from the active session and the thread.",
+            description=(
+                f"{EMOJI_REPLY} This will remove both of you from the active session and the thread.\n\n"
+                f"-# **Tip:** You don't necessarily need to skip a player to call the next player. In fact, multiple players can be tested by one or more testers at once!\n"
+            ),
             color=discord.Color.orange(),
         )
         await interaction.response.send_message(
@@ -1548,10 +1583,14 @@ class ResultsModal(discord.ui.Modal):
         self.tester = tester
         self.queue_manager = queue_manager
         self.bot = bot
+        for p in ["LT3", "HT4", "LT4", "HT5", "LT5"]:
+            self.new_rank.component.add_option(label=p, value=p)
 
-    region = discord.ui.TextInput(label="Region", placeholder="AS, AU, NA, EU", max_length=2, required=True)
     scores = discord.ui.TextInput(label="Scores", placeholder='3-0', max_length=50, required=True)
-    new_rank = discord.ui.TextInput(label="New Rank", placeholder='HT5', max_length=10, required=True)
+    new_rank = discord.ui.Label(
+        text="New Rank",
+        component=discord.ui.RadioGroup(required=True),
+    )
     remarks = discord.ui.TextInput(label="Remarks (optional)", placeholder="What they did well or can improve on...", required=False, max_length=100)
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -1596,20 +1635,11 @@ class ResultsModal(discord.ui.Modal):
                         ephemeral=True,
                     )
 
-        region_val = self.region.value.strip().upper()
+        region_val = (self.queue_manager.region or "Unknown").upper()
         scores_val = self.scores.value.strip()
         remarks_val = self.remarks.value.strip() or None
 
-        rank_input = self.new_rank.value.strip().upper()
-        if rank_input not in TIER_ROLE_PREFIXES:
-            return await interaction.followup.send(
-                embed=discord.Embed(
-                    description=f"{CROSS} Invalid rank `{rank_input}`. Must be one of: "
-                + ", ".join(sorted(TIER_ROLE_PREFIXES))
-                + ".", color=discord.Color.red()
-                ),
-                ephemeral=True,
-            )
+        rank_input = self.new_rank.component.value
 
         target_role_name = f"{rank_input.lower()} {gamemode.lower()}"
         new_role = None
@@ -2099,6 +2129,197 @@ class WaitlistCmd(commands.GroupCog, name="waitlist"):
 
         await user.remove_roles(interaction.guild.get_role(item[0]))
         await interaction.followup.send(f"<:checkmark:1339153448926580818> [Migration Results sent]({results.jump_url})")
+
+    @app_commands.command(
+        name="results", description="Finalize a user's waitlist result (Manager+ only)"
+    )
+    @app_commands.describe(
+        user="Specify the Discord user",
+        region="Specify the user's region",
+        scores="Specify the score",
+        new_role="Specify the new rank role to be added",
+        remarks="Optional remarks",
+    )
+    @app_commands.choices(
+        region=[
+            app_commands.Choice(name="Asia", value="AS"),
+            app_commands.Choice(name="Australia", value="AU"),
+            app_commands.Choice(name="North America", value="NA"),
+            app_commands.Choice(name="Europe", value="EU"),
+        ]
+    )
+    async def tlresults(
+        self,
+        interaction: discord.Interaction,
+        user: discord.Member,
+        region: str,
+        scores: str,
+        new_role: discord.Role,
+        remarks: str = None,
+    ) -> None:
+        if await deny_if_restricted(interaction, interaction.user, user):
+            return
+        await interaction.response.defer()
+
+        allowed_roles = [1304851740226748556, 1460312013535318077, 1304848576190484553]
+        has_permission = any(role.id in allowed_roles for role in interaction.user.roles)
+
+        if not has_permission:
+            return await interaction.followup.send(
+                "<:cross1:1339153202859474956> You do not have permission to use this command.",
+                ephemeral=True
+            )
+
+        if ROLE_IDS[SERVER_IDS["tierlist"]]["linked"] not in [role.id for role in user.roles]:
+            return await interaction.followup.send(
+                "<:cross1:1339153202859474956> This player is not linked. They must link their account to receive results.",
+                ephemeral=True
+            )
+
+        username = "Unknown"
+        linked_uuid = None
+        async with self.bot.tllink_pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute("SHOW TABLES")
+                db_result = await cursor.fetchone()
+                link_table = db_result[0] if db_result else "mystilinking"
+                await cursor.execute(f"SELECT player_name, uuid FROM {link_table} WHERE discord_id = %s", (str(user.id),))
+                db_result = await cursor.fetchone()
+                if db_result:
+                    username = db_result[0]
+                    linked_uuid = db_result[1]
+                else:
+                    return await interaction.followup.send(
+                        "<:cross1:1339153202859474956> Could not find linked account in database despite having the linked role.",
+                        ephemeral=True
+                    )
+
+        gamemode = new_role.name.split(" ")[1]
+        new_rank = new_role.name.split(" ")[0]
+
+        if not (("LT" in new_role.name or "HT" in new_role.name) and "tester" not in new_role.name.lower()):
+            return await interaction.followup.send(
+                "<:warn:1459986909911842846> Double check you selected the correct role!", ephemeral=True
+            )
+
+        high_tier_ranks = ["HT3", "LT2", "HT2", "LT1", "HT1"]
+        if new_rank in high_tier_ranks:
+            return await interaction.followup.send(
+                "<:cross1:1339153202859474956> You cannot give high tier roles with this command. Use `/ht results` instead.",
+                ephemeral=True
+            )
+
+        if ROLE_IDS[SERVER_IDS["tierlist"]]["linked"] not in [role.id for role in interaction.user.roles]:
+            return await interaction.followup.send(
+                "<:cross1:1339153202859474956> As a manager, you must also have your account linked.",
+                embed=discord.Embed(
+                    title=f"{WARN} Account Linking Required",
+                    description=f"Link your account in <#1460525451368861818> to use this command.",
+                    color=discord.Colour.red()
+                ),
+                ephemeral=True
+            )
+
+        if user.id == interaction.user.id and interaction.user.id not in AUTHORIZED_USERS:
+            return await interaction.followup.send(
+                "<:cross1:1339153202859474956> You cannot test yourself!", ephemeral=True
+            )
+
+        previousRank = "N/A"
+        removeRole = None
+        for role in user.roles:
+            try:
+                if len(role.name.split(" ")) > 1 and role.name.split(" ")[1].lower() == gamemode.lower():
+                    removeRole = role
+                    break
+            except Exception:
+                continue
+
+        if removeRole:
+            previousRank = removeRole.name.split(" ")[0]
+            await user.remove_roles(removeRole)
+
+        await user.add_roles(new_role)
+
+        ref_cd = db.reference("/Waitlist Cooldown")
+        ticketcooldown = ref_cd.get()
+        if ticketcooldown:
+            for key, value in ticketcooldown.items():
+                if value.get("User ID") == user.id and value.get("Gamemode") == gamemode:
+                    ref_cd.child(key).delete()
+                    break
+
+        try:
+            await interaction.channel.remove_user(user)
+        except Exception:
+            pass
+
+        embed = discord.Embed(title=f"{username}'s Results :trophy:", color=0x22aef5)
+        embed.add_field(name="Tester", value=interaction.user.mention, inline=True)
+        embed.add_field(name="Region", value=region, inline=True)
+        embed.add_field(name="IGN", value=f"[{username}](https://tierlist.mysticraft.xyz/?player={username})", inline=True)
+        embed.add_field(name="Gamemode", value=gamemode, inline=True)
+        embed.add_field(name="Previous Rank", value=previousRank, inline=True)
+        embed.add_field(name="New Rank", value=new_rank, inline=True)
+        embed.add_field(name="Scores", value=scores, inline=True)
+        if remarks:
+            embed.add_field(name="Remarks", value=remarks, inline=True)
+        embed.set_thumbnail(url=f"https://render.crafty.gg/3d/bust/{username}")
+
+        results_channel = interaction.guild.get_channel(1304859270885412975)
+        results_msg = await results_channel.send(content=user.mention, embed=embed)
+
+        ref_cd.push().set({
+            "User ID": user.id,
+            "Last Tested": int(interaction.created_at.timestamp()),
+            "Gamemode": gamemode,
+        })
+
+        async with self.bot.tlresults_pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute(
+                    """INSERT INTO tlresults
+                    (player_discord_username, player_user_id, uuid, is_linked, region, in_game_username, score, timestamp, old_rank, new_rank, gamemode, remarks, tester_discord_username, tester_user_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (user.name, user.id, linked_uuid, True, region, username, scores,
+                     int(interaction.created_at.timestamp()), previousRank, new_rank, gamemode,
+                     remarks, interaction.user.name, interaction.user.id),
+                )
+                await conn.commit()
+
+        ref_stats = db.reference("/Tierlist Tester Stats")
+        tester_data = ref_stats.child(str(interaction.user.id)).get() or {}
+        old_rep = tester_data.get("count", 0) + 2 * tester_data.get("high_count", 0)
+        old_tier = get_tier_index(old_rep)
+        timestamps = tester_data.get("timestamps", [])
+        timestamps.append(int(interaction.created_at.timestamp()))
+        ref_stats.child(str(interaction.user.id)).update({"count": len(timestamps), "timestamps": timestamps})
+
+        new_rep = len(timestamps) + 2 * tester_data.get("high_count", 0)
+        new_tier = get_tier_index(new_rep)
+        if new_tier > old_tier:
+            n_role_id = TIER_ROLES.get(new_tier)
+            o_role_id = TIER_ROLES.get(old_tier)
+            if o_role_id:
+                await interaction.user.remove_roles(interaction.guild.get_role(o_role_id))
+            if n_role_id:
+                await interaction.user.add_roles(interaction.guild.get_role(n_role_id))
+            log_ch = interaction.guild.get_channel(1467403596780929055)
+            rank_embed = discord.Embed(
+                description=f"{interaction.user.mention} reached **{TIER_THRESHOLDS[new_tier]}** reps and ranked up to `{TIER_NAMES[new_tier]}`!",
+                color=discord.Color.from_rgb(*tier_colors[new_tier]),
+            )
+            await log_ch.send(content=interaction.user.mention, embed=rank_embed)
+
+        item = return_item(gamemode.lower())
+        await user.remove_roles(interaction.guild.get_role(item[0]))
+        try:
+            queue_manager = self.queue_manager_pool.get_manager(gamemode.lower())
+            queue_manager.remove_active_session(user.id)
+        except Exception as e:
+            print(f"Queue Sync Error: {e}")
+
+        await interaction.followup.send(f"<:checkmark:1339153448926580818> [Results sent]({results_msg.jump_url})")
 
 
     @app_commands.command(
